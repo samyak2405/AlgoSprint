@@ -259,17 +259,32 @@ while (!maxHeap.isEmpty()) {
 freq.put("apple", 1);
 freq.merge("apple", 1, Integer::sum);
 int count = freq.getOrDefault("apple", 0);`,
-  hashMapInternals: `// How HashMap works in Java (conceptual flow):
-// 1) Compute hash: h = key.hashCode(), spread bits.
-// 2) Pick bucket index: idx = (n - 1) & h (n is table size, power of 2).
-// 3) If bucket empty -> insert node.
-// 4) If collision -> compare keys in bucket chain/tree:
-//    - same key -> overwrite value
-//    - different key -> append into bucket
-// 5) If load factor threshold crossed -> resize table (usually x2),
-//    then re-distribute existing nodes.
-// 6) In modern Java, long collision chains may treeify into red-black tree
-//    buckets for better worst-case performance.`,
+  hashMapInternals: `// HashMap internals in Java (JDK 8+):
+// Capacity is power of 2, default 16, loadFactor default 0.75.
+//
+// put(key, value):
+// 1) hash = spread(key.hashCode())  // mixes high bits to reduce collisions
+// 2) index = (table.length - 1) & hash
+// 3) If bucket empty -> place node directly.
+// 4) Else walk bucket:
+//    - same key found -> overwrite value
+//    - otherwise append/insert in bucket structure
+// 5) size++ ; if size > threshold (capacity * loadFactor) -> resize (x2)
+// 6) During resize, nodes are re-distributed to new buckets.
+//
+// get(key):
+// 1) Compute same hash + index.
+// 2) Scan bucket and compare hash + equals(key).
+// 3) Return value or null.
+//
+// Collision handling:
+// - starts as linked list in bucket
+// - if bucket gets too long and table is sufficiently large, bucket may treeify
+//   into a red-black tree for better worst-case lookup.
+//
+// Typical complexity:
+// - put/get/remove: O(1) average
+// - worst-case: O(n), improved in heavy-collision scenarios via treeified buckets.`,
   linkedHashMap: `Map<Integer, String> map = new LinkedHashMap<>();
 map.put(3, "C");
 map.put(1, "A");
@@ -3724,7 +3739,6 @@ export default function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [cueText, setCueText] = useState("");
   const [theme, setTheme] = useState("light");
-  const [wrapCode, setWrapCode] = useState(false);
   const [objectiveView, setObjectiveView] = useState("core");
 
   const searchIndex = useMemo(() => buildSearchIndex(SECTIONS), []);
@@ -3807,8 +3821,6 @@ export default function App() {
                   getCodeVariants={getCodeVariants}
                   renderHighlightedCode={renderHighlightedCode}
                   dpSteps={DP_INTERACTIVE_STEPS}
-                  wrapCode={wrapCode}
-                  onToggleWrap={() => setWrapCode((v) => !v)}
                 />
               ) : (
                 <QuestionOptions currentNode={currentNode} onSelectOption={handleOption} onBack={goBack} hasPath={path.length > 0} />
