@@ -1,5 +1,17 @@
 import React, { useCallback, useState } from "react";
 import { DpInteractiveDemo } from "./DpInteractiveDemo";
+import { ArrayVisualizer } from "./ArrayVisualizer";
+import { StackVisualizer } from "./StackVisualizer";
+import { QueueVisualizer } from "./QueueVisualizer";
+import { LinkedListVisualizer } from "./LinkedListVisualizer";
+import { BSTVisualizer } from "./BSTVisualizer";
+import { DequeVisualizer } from "./DequeVisualizer";
+import { TrieVisualizer } from "./TrieVisualizer";
+import { UnionFindVisualizer } from "./UnionFindVisualizer";
+import { FenwickTreeVisualizer } from "./FenwickTreeVisualizer";
+import { SegmentTreeVisualizer } from "./SegmentTreeVisualizer";
+import { SparseTableVisualizer } from "./SparseTableVisualizer";
+import { TwoHeapsVisualizer } from "./TwoHeapsVisualizer";
 import { HashMapVisualizer } from "./HashMapVisualizer";
 import { PriorityQueueVisualizer } from "./PriorityQueueVisualizer";
 import { RedBlackTreeVisualizer } from "./RedBlackTreeVisualizer";
@@ -707,6 +719,18 @@ export function ResultCard({ result, onReset, getCodeVariants, renderHighlighted
         </div>
       </div>
       {result.interactiveKey ? <DpInteractiveDemo demoKey={result.interactiveKey} stepsMap={dpSteps} /> : null}
+      {(result.name === "ArrayList" || result.name === "Array (int[] / T[])") ? <ArrayVisualizer /> : null}
+      {result.name === "Stack" ? <StackVisualizer /> : null}
+      {result.name === "Queue" ? <QueueVisualizer /> : null}
+      {result.name === "LinkedList (Deque API)" ? <LinkedListVisualizer /> : null}
+      {(result.name === "TreeMap" || result.name === "TreeSet") ? <BSTVisualizer /> : null}
+      {result.name === "Deque / Monotonic Queue" ? <DequeVisualizer /> : null}
+      {result.name === "Trie" ? <TrieVisualizer /> : null}
+      {result.name === "Union-Find (Disjoint Set Union)" ? <UnionFindVisualizer /> : null}
+      {result.name === "Fenwick Tree (BIT)" ? <FenwickTreeVisualizer /> : null}
+      {result.name === "Segment Tree" ? <SegmentTreeVisualizer /> : null}
+      {result.name === "Sparse Table" ? <SparseTableVisualizer /> : null}
+      {result.name === "Two Heaps (Median DS)" ? <TwoHeapsVisualizer /> : null}
       {result.name === "HashMap" ? <HashMapVisualizer /> : null}
       {result.name === "PriorityQueue" ? <PriorityQueueVisualizer /> : null}
       {result.name === "Red-Black Tree (via TreeMap/TreeSet)" ? <RedBlackTreeVisualizer /> : null}

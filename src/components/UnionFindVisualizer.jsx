@@ -2,10 +2,18 @@ import React, { useRef, useState } from "react";
 
 const ANIM_MS = 400;
 const N = 7;
+const SVG_W = 760, SVG_H = 270;
+const CX = SVG_W / 2, CY = 125;
+const RX = 155, RY = 78;
+
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 export function UnionFindVisualizer() {
-  const init = () => ({ parent: Array.from({ length: N }, (_, i) => i), rank: new Array(N).fill(0) });
+  const init = () => ({
+    parent: Array.from({ length: N }, (_, i) => i),
+    rank: new Array(N).fill(0),
+  });
+
   const [uf, setUF] = useState(init);
   const [xInput, setXInput] = useState("");
   const [yInput, setYInput] = useState("");
@@ -20,34 +28,32 @@ export function UnionFindVisualizer() {
   const addTrace = msg => setTrace(p => [...p.slice(-10), msg]);
 
   const findRoot = (parent, x) => {
-    let path = [];
+    const path = [];
     while (parent[x] !== x) { path.push(x); x = parent[x]; }
-    path.push(x); // root
+    path.push(x);
     return { root: x, path };
   };
 
   const handleFind = async () => {
     const x = Number(xInput);
-    if (isNaN(x) || x < 0 || x >= N) { setStatus(`Enter node 0–${N - 1}.`); return; }
+    if (isNaN(x) || x < 0 || x >= N) { setStatus(`Enter a node 0–${N - 1}.`); return; }
     setAnimating(true);
     const { parent } = ufRef.current;
     const { root, path } = findRoot(parent, x);
-    setStatus(`find(${x}): traversing path ${path.join(" → ")} — root = ${root}`);
-    addTrace(`find(${x}) = ${root}`);
-
-    // Highlight path step by step
+    setStatus(`find(${x}): path ${path.join(" → ")} — root = ${root}`);
+    addTrace(`find(${x}) = root ${root}`);
     for (let i = 0; i < path.length; i++) {
       setHighlighted(path.slice(0, i + 1));
-      await sleep(ANIM_MS * 0.6);
+      await sleep(ANIM_MS * 0.65);
     }
-
-    // Path compression
     const newParent = [...parent];
     for (const node of path.slice(0, -1)) newParent[node] = root;
     syncUF({ ...ufRef.current, parent: newParent });
     setPathNodes(path.slice(0, -1));
-    setStatus(`Path compression: all nodes ${path.slice(0,-1).join(",")} now point directly to root ${root}`);
-    addTrace(`path compress → all point to root ${root}`);
+    if (path.length > 2) {
+      setStatus(`Path compressed: [${path.slice(0, -1).join(",")}] → root ${root}`);
+      addTrace(`compressed → root ${root}`);
+    }
     await sleep(ANIM_MS);
     setHighlighted([]); setPathNodes([]);
     setAnimating(false);
@@ -62,22 +68,20 @@ export function UnionFindVisualizer() {
     const { parent, rank } = ufRef.current;
     const { root: rx, path: px } = findRoot(parent, x);
     const { root: ry, path: py } = findRoot(parent, y);
-
     setHighlighted([...new Set([...px, ...py])]);
-    await sleep(ANIM_MS * 0.8);
-
+    await sleep(ANIM_MS * 0.9);
     if (rx === ry) {
-      setStatus(`union(${x}, ${y}): already same component (root ${rx})`);
-      addTrace(`union(${x},${y}) → same root ${rx}`);
+      setStatus(`union(${x}, ${y}): already same component — root ${rx}`);
+      addTrace(`union(${x},${y}) → already connected`);
     } else {
       const newParent = [...parent];
       const newRank = [...rank];
-      if (rank[rx] < rank[ry]) { newParent[rx] = ry; }
-      else if (rank[rx] > rank[ry]) { newParent[ry] = rx; }
+      if (rank[rx] < rank[ry]) newParent[rx] = ry;
+      else if (rank[rx] > rank[ry]) newParent[ry] = rx;
       else { newParent[ry] = rx; newRank[rx]++; }
       syncUF({ parent: newParent, rank: newRank });
-      setStatus(`union(${x}, ${y}): merged roots ${rx} and ${ry} (union by rank)`);
-      addTrace(`union(${x},${y}) merged roots ${rx},${ry}`);
+      setStatus(`union(${x}, ${y}): merged root ${rx} ← root ${ry} (union by rank)`);
+      addTrace(`union(${x},${y}) merged ${rx}↔${ry}`);
     }
     await sleep(ANIM_MS);
     setHighlighted([]);
@@ -94,7 +98,6 @@ export function UnionFindVisualizer() {
     setStatus(`Reset — ${N} isolated nodes.`); setTrace([]);
   };
 
-  // Compute connected components for coloring
   const { parent } = uf;
   const roots = parent.map((_, i) => {
     let x = i;
@@ -102,21 +105,20 @@ export function UnionFindVisualizer() {
     return x;
   });
   const uniqueRoots = [...new Set(roots)];
+  const COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f97316"];
   const colorMap = {};
-  const colors = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f97316"];
-  uniqueRoots.forEach((r, i) => { colorMap[r] = colors[i % colors.length]; });
+  uniqueRoots.forEach((r, i) => { colorMap[r] = COLORS[i % COLORS.length]; });
 
-  // SVG layout
-  const CX = 380, CY = 80, R_ORBIT = 60;
-  const nodePositions = Array.from({ length: N }, (_, i) => {
+  // Ellipse layout — each node gets equal angle spacing
+  const nodePos = Array.from({ length: N }, (_, i) => {
     const angle = (i * 2 * Math.PI) / N - Math.PI / 2;
-    return { x: CX + R_ORBIT * 2.5 * Math.cos(angle), y: CY + 60 + R_ORBIT * Math.sin(angle) };
+    return { x: CX + RX * Math.cos(angle), y: CY + RY * Math.sin(angle) };
   });
 
   return (
     <div className="uf-viz">
       <div className="uf-viz-header">
-        <h4>Union-Find (Disjoint Set) Visualizer</h4>
+        <h4>Union-Find (DSU) Visualizer</h4>
         <span>{uniqueRoots.length} component{uniqueRoots.length !== 1 ? "s" : ""}</span>
       </div>
 
@@ -133,32 +135,57 @@ export function UnionFindVisualizer() {
       <p className="uf-viz-status">{status}</p>
 
       <div className="uf-canvas-wrap">
-        <svg className="uf-svg" viewBox="0 0 760 200" preserveAspectRatio="xMidYMid meet">
+        <svg className="uf-svg" viewBox={`0 0 ${SVG_W} ${SVG_H}`} preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <marker id="uf-arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="rgba(100,116,139,.5)" />
+            </marker>
+            <marker id="uf-arrow-compressed" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L8,3 z" fill="#6366f1" />
+            </marker>
+          </defs>
+
           {/* parent edges */}
           {parent.map((p, i) => {
             if (p === i) return null;
-            const from = nodePositions[i];
-            const to = nodePositions[p];
-            const isPath = pathNodes.includes(i);
+            const from = nodePos[i];
+            const to = nodePos[p];
+            const isCompressed = pathNodes.includes(i);
+            // Shorten line so it doesn't overlap node circles (r=22)
+            const dx = to.x - from.x, dy = to.y - from.y;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            const offset = 24;
+            const x1 = from.x + (dx / dist) * offset;
+            const y1 = from.y + (dy / dist) * offset;
+            const x2 = to.x - (dx / dist) * offset;
+            const y2 = to.y - (dy / dist) * offset;
             return (
-              <line key={`edge-${i}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y}
-                className={`uf-edge ${isPath ? "compressed" : ""}`} />
+              <line key={`edge-${i}`} x1={x1} y1={y1} x2={x2} y2={y2}
+                className={`uf-edge ${isCompressed ? "compressed" : ""}`}
+                markerEnd={isCompressed ? "url(#uf-arrow-compressed)" : "url(#uf-arrow)"} />
             );
           })}
+
           {/* nodes */}
-          {nodePositions.map(({ x, y }, i) => {
-            const isHighlighted = highlighted.includes(i);
+          {nodePos.map(({ x, y }, i) => {
+            const isHl = highlighted.includes(i);
             const color = colorMap[roots[i]];
             const isRoot = parent[i] === i;
             return (
               <g key={i}>
                 <circle cx={x} cy={y} r={22}
-                  className={`uf-node ${isHighlighted ? "active" : ""}`}
-                  style={{ fill: isHighlighted ? "#6366f1" : color + "33", stroke: color }} />
-                <text x={x} y={y + 5} textAnchor="middle" className="uf-node-label"
-                  style={{ fill: isHighlighted ? "#fff" : color }}>{i}</text>
+                  className={`uf-node ${isHl ? "active" : ""}`}
+                  style={{
+                    fill: isHl ? color : color + "28",
+                    stroke: color,
+                  }} />
+                <text x={x} y={y + 5} textAnchor="middle"
+                  className="uf-node-label"
+                  style={{ fill: isHl ? "#fff" : color }}>
+                  {i}
+                </text>
                 {isRoot && (
-                  <text x={x} y={y + 36} textAnchor="middle" className="uf-root-label">root</text>
+                  <text x={x} y={y + 38} textAnchor="middle" className="uf-root-label">root</text>
                 )}
               </g>
             );
@@ -166,10 +193,12 @@ export function UnionFindVisualizer() {
         </svg>
       </div>
 
+      {/* parent array */}
       <div className="uf-parent-row">
         {parent.map((p, i) => (
-          <div key={i} className="uf-parent-cell">
-            <div className="uf-parent-idx">{i}</div>
+          <div key={i} className="uf-parent-cell"
+            style={{ borderColor: colorMap[roots[i]] + "80" }}>
+            <div className="uf-parent-idx">[{i}]</div>
             <div className="uf-parent-val" style={{ color: colorMap[roots[i]] }}>{p}</div>
             <div className="uf-parent-label">parent</div>
           </div>
@@ -179,10 +208,10 @@ export function UnionFindVisualizer() {
       <div className="array-explain">
         <h5>How it works</h5>
         <ol>
-          <li><strong>find(x)</strong>: follow parent pointers to root; compress path to O(α) amortized.</li>
-          <li><strong>union(x,y)</strong>: find roots, attach smaller-rank tree under larger-rank root.</li>
-          <li><strong>Path compression + Union by rank</strong> → near-O(1) per operation.</li>
-          <li>Nodes with the same color belong to the same connected component.</li>
+          <li><strong>find(x)</strong> — follow parent[] until self-loop; compress path so all nodes skip to root.</li>
+          <li><strong>union(x,y)</strong> — find both roots; attach smaller-rank root under larger to keep tree flat.</li>
+          <li><strong>Path compression + Union by rank</strong> → O(α(n)) ≈ O(1) amortised per op.</li>
+          <li>Same colour = same connected component. Nodes labelled <em>root</em> are component representatives.</li>
         </ol>
         <h5>Operation trace</h5>
         <div className="array-trace">
