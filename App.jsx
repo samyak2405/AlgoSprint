@@ -401,6 +401,19 @@ int partition(int[] a, int l, int r) {
     mergeSort(a, l, m);
     mergeSort(a, m + 1, r);
     merge(a, l, m, r);
+}
+void merge(int[] a, int l, int m, int r) {
+    int n1 = m - l + 1, n2 = r - m;
+    int[] L = new int[n1], R = new int[n2];
+    for (int i = 0; i < n1; i++) L[i] = a[l + i];
+    for (int j = 0; j < n2; j++) R[j] = a[m + 1 + j];
+    int i = 0, j = 0, k = l;
+    while (i < n1 && j < n2) {
+        if (L[i] <= R[j]) a[k++] = L[i++];
+        else a[k++] = R[j++];
+    }
+    while (i < n1) a[k++] = L[i++];
+    while (j < n2) a[k++] = R[j++];
 }`,
   insertionSort: `void insertionSort(int[] a) {
     for (int i = 1; i < a.length; i++) {
@@ -421,6 +434,66 @@ int partition(int[] a, int l, int r) {
         while (cnt[v]-- > 0) out[idx++] = v;
     }
     return out;
+}`,
+  bubbleSort: `void bubbleSort(int[] a) {
+    int n = a.length;
+    for (int i = 0; i < n; i++) {
+        boolean swapped = false;
+        for (int j = 0; j < n - 1 - i; j++) {
+            if (a[j] > a[j + 1]) {
+                int t = a[j]; a[j] = a[j + 1]; a[j + 1] = t;
+                swapped = true;
+            }
+        }
+        if (!swapped) break;
+    }
+}`,
+  selectionSort: `void selectionSort(int[] a) {
+    int n = a.length;
+    for (int i = 0; i < n; i++) {
+        int minIdx = i;
+        for (int j = i + 1; j < n; j++) {
+            if (a[j] < a[minIdx]) minIdx = j;
+        }
+        if (minIdx != i) {
+            int t = a[i]; a[i] = a[minIdx]; a[minIdx] = t;
+        }
+    }
+}`,
+  heapSort: `void heapSort(int[] a) {
+    int n = a.length;
+    for (int i = n / 2 - 1; i >= 0; i--) heapify(a, n, i);
+    for (int end = n - 1; end > 0; end--) {
+        int t = a[0]; a[0] = a[end]; a[end] = t;
+        heapify(a, end, 0);
+    }
+}
+void heapify(int[] a, int n, int i) {
+    int best = i, l = 2 * i + 1, r = 2 * i + 2;
+    if (l < n && a[l] > a[best]) best = l;
+    if (r < n && a[r] > a[best]) best = r;
+    if (best != i) {
+        int t = a[i]; a[i] = a[best]; a[best] = t;
+        heapify(a, n, best);
+    }
+}`,
+  radixSort: `void radixSort(int[] a) {
+    int max = Arrays.stream(a).max().orElse(0);
+    for (int exp = 1; max / exp > 0; exp *= 10) {
+        countingSortByDigit(a, exp);
+    }
+}
+void countingSortByDigit(int[] a, int exp) {
+    int n = a.length;
+    int[] out = new int[n];
+    int[] cnt = new int[10];
+    for (int x : a) cnt[(x / exp) % 10]++;
+    for (int i = 1; i < 10; i++) cnt[i] += cnt[i - 1];
+    for (int i = n - 1; i >= 0; i--) {
+        int d = (a[i] / exp) % 10;
+        out[--cnt[d]] = a[i];
+    }
+    System.arraycopy(out, 0, a, 0, n);
 }`,
   bfsShortestPath: `int shortestPath(int n, List<List<Integer>> g, int src, int dst) {
     int[] dist = new int[n];
@@ -2351,97 +2424,87 @@ int pos = Arrays.binarySearch(a, 10);`,
 const ALGORITHM_TREE = {
   id: "algo-root",
   icon: "🧠",
-  question: "What type of problem are you solving?",
+  question: "Pick an algorithm type",
   options: [
     {
-      label: "Search in data",
+      label: "Searching Algorithms",
       next: {
-        id: "algo-search",
+        id: "algo-search-group",
         icon: "🔎",
-        question: "Is the input already sorted?",
+        question: "Pick a searching algorithm",
         options: [
           {
-            label: "Yes",
-            next: {
-              id: "algo-binary-search-variants",
-              icon: "🧪",
-              question: "Pick the binary search variation",
-              options: [
-                {
-                  label: "Classic exact match",
-                  result: {
-                    name: "Binary Search",
-                    pkg: "Search / Divide and Conquer",
-                    whenToUse: "Use when answer space or array is monotonic/sorted and exact value is needed.",
-                    why: "Halves search space each step.",
-                    complexity: { time: "O(log n)", space: "O(1)" },
-                    tradeoffs: "Requires sorted/monotonic property.",
-                    javaCode: JAVA_SNIPPETS.binarySearch,
-                    color: "#0ea5e9",
-                  },
-                },
-                {
-                  label: "First/last occurrence",
-                  result: {
-                    name: "Lower Bound / Upper Bound",
-                    pkg: "Search / Divide and Conquer",
-                    whenToUse: "Use when duplicates exist and you need first or last index.",
-                    why: "Bound searches cleanly locate range borders.",
-                    complexity: { each_bound: "O(log n)", combined: "O(log n)", space: "O(1)" },
-                    tradeoffs: "Boundary convention mistakes are common.",
-                    codeVariants: [
-                      { title: "Lower bound", code: JAVA_SNIPPETS.lowerBound },
-                      { title: "Upper bound", code: JAVA_SNIPPETS.upperBound },
-                      { title: "First/last range", code: JAVA_SNIPPETS.firstLastPosition },
-                    ],
-                    javaCode: JAVA_SNIPPETS.lowerBound,
-                    color: "#0ea5e9",
-                  },
-                },
-                {
-                  label: "Rotated sorted array",
-                  result: {
-                    name: "Search in Rotated Sorted Array",
-                    pkg: "Search / Divide and Conquer",
-                    whenToUse: "Use when array is sorted then rotated, and you need target index.",
-                    why: "One side is always sorted; use that invariant to discard half.",
-                    complexity: { time: "O(log n)", space: "O(1)" },
-                    tradeoffs: "With many duplicates, worst-case may degrade.",
-                    javaCode: JAVA_SNIPPETS.rotatedArraySearch,
-                    color: "#0ea5e9",
-                  },
-                },
-                {
-                  label: "Peak / mountain style",
-                  result: {
-                    name: "Peak Element Binary Search",
-                    pkg: "Search / Divide and Conquer",
-                    whenToUse: "Use when local slope information can guide toward peak/transition.",
-                    why: "Comparing adjacent elements reveals direction to answer.",
-                    complexity: { time: "O(log n)", space: "O(1)" },
-                    tradeoffs: "Depends on guaranteed structural property (peak/bitonic pattern).",
-                    javaCode: JAVA_SNIPPETS.peakElement,
-                    color: "#0ea5e9",
-                  },
-                },
-                {
-                  label: "Binary search on answer",
-                  result: {
-                    name: "Binary Search on Answer",
-                    pkg: "Optimization via Feasibility",
-                    whenToUse: "Use when feasibility is monotonic over numeric answer space.",
-                    why: "Transforms optimization into yes/no boundary search.",
-                    complexity: { time: "O(log range * checkCost)", space: "O(1)" },
-                    tradeoffs: "Need a correct monotonic predicate.",
-                    javaCode: JAVA_SNIPPETS.binarySearchAnswer,
-                    color: "#0ea5e9",
-                  },
-                },
-              ],
+            label: "Binary Search",
+            result: {
+              name: "Binary Search",
+              pkg: "Search / Divide and Conquer",
+              whenToUse: "Use when answer space or array is monotonic/sorted and exact value is needed.",
+              why: "Halves search space each step.",
+              complexity: { time: "O(log n)", space: "O(1)" },
+              tradeoffs: "Requires sorted/monotonic property.",
+              javaCode: JAVA_SNIPPETS.binarySearch,
+              color: "#0ea5e9",
             },
           },
           {
-            label: "No",
+            label: "Lower Bound / Upper Bound",
+            result: {
+              name: "Lower Bound / Upper Bound",
+              pkg: "Search / Divide and Conquer",
+              whenToUse: "Use when duplicates exist and you need first or last index.",
+              why: "Bound searches cleanly locate range borders.",
+              complexity: { each_bound: "O(log n)", combined: "O(log n)", space: "O(1)" },
+              tradeoffs: "Boundary convention mistakes are common.",
+              codeVariants: [
+                { title: "Lower bound", code: JAVA_SNIPPETS.lowerBound },
+                { title: "Upper bound", code: JAVA_SNIPPETS.upperBound },
+                { title: "First/last range", code: JAVA_SNIPPETS.firstLastPosition },
+              ],
+              javaCode: JAVA_SNIPPETS.lowerBound,
+              color: "#0ea5e9",
+            },
+          },
+          {
+            label: "Search in Rotated Sorted Array",
+            result: {
+              name: "Search in Rotated Sorted Array",
+              pkg: "Search / Divide and Conquer",
+              whenToUse: "Use when array is sorted then rotated, and you need target index.",
+              why: "One side is always sorted; use that invariant to discard half.",
+              complexity: { time: "O(log n)", space: "O(1)" },
+              tradeoffs: "With many duplicates, worst-case may degrade.",
+              javaCode: JAVA_SNIPPETS.rotatedArraySearch,
+              color: "#0ea5e9",
+            },
+          },
+          {
+            label: "Peak Element Binary Search",
+            result: {
+              name: "Peak Element Binary Search",
+              pkg: "Search / Divide and Conquer",
+              whenToUse: "Use when local slope information can guide toward peak/transition.",
+              why: "Comparing adjacent elements reveals direction to answer.",
+              complexity: { time: "O(log n)", space: "O(1)" },
+              tradeoffs: "Depends on guaranteed structural property (peak/bitonic pattern).",
+              javaCode: JAVA_SNIPPETS.peakElement,
+              color: "#0ea5e9",
+            },
+          },
+          {
+            label: "Binary Search on Answer",
+            result: {
+              name: "Binary Search on Answer",
+              pkg: "Optimization via Feasibility",
+              whenToUse: "Use when feasibility is monotonic over numeric answer space.",
+              why: "Transforms optimization into yes/no boundary search.",
+              complexity: { time: "O(log range * checkCost)", space: "O(1)" },
+              tradeoffs: "Need a correct monotonic predicate.",
+              javaCode: JAVA_SNIPPETS.binarySearchAnswer,
+              color: "#0ea5e9",
+            },
+          },
+          {
+            label: "Linear Search",
             result: {
               name: "Linear Search",
               pkg: "Brute Force",
@@ -2457,14 +2520,14 @@ const ALGORITHM_TREE = {
       },
     },
     {
-      label: "Sort data",
+      label: "Sorting Algorithms",
       next: {
-        id: "algo-sort",
+        id: "algo-sort-group",
         icon: "🧮",
-        question: "What is your strongest constraint?",
+        question: "Pick a sorting algorithm",
         options: [
           {
-            label: "Fast average and in-place",
+            label: "Quick Sort",
             result: {
               name: "Quick Sort",
               pkg: "Divide and Conquer",
@@ -2477,7 +2540,7 @@ const ALGORITHM_TREE = {
             },
           },
           {
-            label: "Stable and guaranteed n log n",
+            label: "Merge Sort",
             result: {
               name: "Merge Sort",
               pkg: "Divide and Conquer",
@@ -2490,7 +2553,7 @@ const ALGORITHM_TREE = {
             },
           },
           {
-            label: "Nearly sorted input",
+            label: "Insertion Sort",
             result: {
               name: "Insertion Sort",
               pkg: "Incremental Sorting",
@@ -2503,7 +2566,7 @@ const ALGORITHM_TREE = {
             },
           },
           {
-            label: "Small integer key range",
+            label: "Counting Sort",
             result: {
               name: "Counting Sort",
               pkg: "Non-comparison Sort",
@@ -2515,18 +2578,70 @@ const ALGORITHM_TREE = {
               color: "#f97316",
             },
           },
+          {
+            label: "Bubble Sort",
+            result: {
+              name: "Bubble Sort",
+              pkg: "Comparison Sort (simple)",
+              whenToUse: "Teaching only; tiny n or nearly sorted with early exit.",
+              why: "Very simple comparisons and swaps; easy to visualize.",
+              complexity: { best: "O(n)", avgWorst: "O(n^2)", space: "O(1)" },
+              tradeoffs: "Impractical for large n.",
+              javaCode: JAVA_SNIPPETS.bubbleSort,
+              color: "#f97316",
+            },
+          },
+          {
+            label: "Selection Sort",
+            result: {
+              name: "Selection Sort",
+              pkg: "Comparison Sort (simple)",
+              whenToUse: "Tiny arrays or minimizing writes (each element moved once).",
+              why: "At most n swaps; minimal auxiliary memory.",
+              complexity: { time: "O(n^2)", space: "O(1)" },
+              tradeoffs: "Always quadratic comparisons; not stable in typical swap form.",
+              javaCode: JAVA_SNIPPETS.selectionSort,
+              color: "#f97316",
+            },
+          },
+          {
+            label: "Heap Sort",
+            result: {
+              name: "Heap Sort",
+              pkg: "Comparison Sort (heap)",
+              whenToUse: "Need guaranteed O(n log n) worst case in-place.",
+              why: "Uses binary heap; no extra array like merge sort.",
+              complexity: { time: "O(n log n)", space: "O(1)" },
+              tradeoffs: "Not stable; worse cache behavior than quick sort on average.",
+              javaCode: JAVA_SNIPPETS.heapSort,
+              color: "#f97316",
+            },
+          },
+          {
+            label: "Radix Sort",
+            result: {
+              name: "Radix Sort",
+              pkg: "Non-comparison Sort",
+              whenToUse: "Non-negative integers (or fixed-width keys) with many digits but moderate base passes.",
+              why: "Stable digit passes with counting sort per digit.",
+              complexity: { time: "O(d * (n + b))", space: "O(n + b)" },
+              tradeoffs: "Needs digit-friendly keys; d = digits, b = base.",
+              javaCode: JAVA_SNIPPETS.radixSort,
+              color: "#f97316",
+            },
+          },
         ],
       },
     },
     {
-      label: "Graph shortest path / traversal",
+      label: "Graph Algorithms",
       next: {
-        id: "algo-graph",
+        id: "algo-graph-group",
         icon: "🕸️",
-        question: "Which graph property applies?",
+        question: "Pick a graph algorithm",
         options: [
           {
-            label: "Unweighted shortest path",
+            label: "BFS",
             result: {
               name: "BFS",
               pkg: "Graph Traversal",
@@ -2539,7 +2654,7 @@ const ALGORITHM_TREE = {
             },
           },
           {
-            label: "Weighted edges (non-negative)",
+            label: "Dijkstra",
             result: {
               name: "Dijkstra",
               pkg: "Greedy + Priority Queue",
@@ -2552,7 +2667,7 @@ const ALGORITHM_TREE = {
             },
           },
           {
-            label: "Negative edge weights exist",
+            label: "Bellman-Ford",
             result: {
               name: "Bellman-Ford",
               pkg: "Relaxation-based DP",
@@ -2568,42 +2683,72 @@ const ALGORITHM_TREE = {
       },
     },
     {
-      label: "String matching",
-      result: {
-        name: "KMP (Knuth-Morris-Pratt)",
-        pkg: "Pattern Matching",
-        whenToUse: "Use when searching a pattern in long text repeatedly with deterministic linear runtime.",
-        why: "LPS table avoids re-checking matched prefix characters.",
-        complexity: { preprocess: "O(m)", search: "O(n)", total: "O(n + m)" },
-        tradeoffs: "More setup complexity than naive matching.",
-        javaCode: JAVA_SNIPPETS.kmp,
-        color: "#a855f7",
+      label: "String Algorithms",
+      next: {
+        id: "algo-string-group",
+        icon: "🔤",
+        question: "Pick a string algorithm",
+        options: [
+          {
+            label: "KMP (Knuth-Morris-Pratt)",
+            result: {
+              name: "KMP (Knuth-Morris-Pratt)",
+              pkg: "Pattern Matching",
+              whenToUse: "Use when searching a pattern in long text repeatedly with deterministic linear runtime.",
+              why: "LPS table avoids re-checking matched prefix characters.",
+              complexity: { preprocess: "O(m)", search: "O(n)", total: "O(n + m)" },
+              tradeoffs: "More setup complexity than naive matching.",
+              javaCode: JAVA_SNIPPETS.kmp,
+              color: "#a855f7",
+            },
+          },
+        ],
       },
     },
     {
-      label: "Overlapping subproblems / optimization",
-      result: {
-        name: "Dynamic Programming (Top-down Memoization)",
-        pkg: "DP",
-        whenToUse: "Use when brute force has repeated states and optimal substructure.",
-        why: "Caches state results to avoid exponential recomputation.",
-        complexity: { time: "states * transitions", space: "states" },
-        tradeoffs: "State design is the hardest part.",
-        javaCode: JAVA_SNIPPETS.topDownDp,
-        color: "#6366f1",
+      label: "Dynamic Programming Algorithms",
+      next: {
+        id: "algo-dp-group",
+        icon: "🧮",
+        question: "Pick a DP algorithm",
+        options: [
+          {
+            label: "Dynamic Programming (Top-down Memoization)",
+            result: {
+              name: "Dynamic Programming (Top-down Memoization)",
+              pkg: "DP",
+              whenToUse: "Use when brute force has repeated states and optimal substructure.",
+              why: "Caches state results to avoid exponential recomputation.",
+              complexity: { time: "states * transitions", space: "states" },
+              tradeoffs: "State design is the hardest part.",
+              javaCode: JAVA_SNIPPETS.topDownDp,
+              color: "#6366f1",
+            },
+          },
+        ],
       },
     },
     {
-      label: "Range sum with point updates",
-      result: {
-        name: "Fenwick Tree (BIT)",
-        pkg: "Range Query Data Structure",
-        whenToUse: "Use for frequent prefix/range sum queries and point updates.",
-        why: "Bitwise index jumps keep updates/queries logarithmic.",
-        complexity: { update: "O(log n)", prefixSum: "O(log n)", space: "O(n)" },
-        tradeoffs: "Less flexible than full segment tree for complex operations.",
-        javaCode: JAVA_SNIPPETS.fenwick,
-        color: "#06b6d4",
+      label: "Range Query Algorithms",
+      next: {
+        id: "algo-range-group",
+        icon: "📐",
+        question: "Pick a range-query algorithm",
+        options: [
+          {
+            label: "Fenwick Tree (BIT)",
+            result: {
+              name: "Fenwick Tree (BIT)",
+              pkg: "Range Query Data Structure",
+              whenToUse: "Use for frequent prefix/range sum queries and point updates.",
+              why: "Bitwise index jumps keep updates/queries logarithmic.",
+              complexity: { update: "O(log n)", prefixSum: "O(log n)", space: "O(n)" },
+              tradeoffs: "Less flexible than full segment tree for complex operations.",
+              javaCode: JAVA_SNIPPETS.fenwick,
+              color: "#06b6d4",
+            },
+          },
+        ],
       },
     },
   ],

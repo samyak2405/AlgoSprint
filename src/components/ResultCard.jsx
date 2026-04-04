@@ -15,6 +15,7 @@ import { TwoHeapsVisualizer } from "./TwoHeapsVisualizer";
 import { HashMapVisualizer } from "./HashMapVisualizer";
 import { PriorityQueueVisualizer } from "./PriorityQueueVisualizer";
 import { RedBlackTreeVisualizer } from "./RedBlackTreeVisualizer";
+import { SortingVisualizer, SORTING_VISUALIZER_NAMES } from "./SortingVisualizer";
 
 function getProblemLadder(result) {
   const byName = {
@@ -190,6 +191,26 @@ function getProblemLadder(result) {
       easy: ["Sort Colors", "Relative Sort Array"],
       medium: ["Maximum Gap", "Sort Characters By Frequency"],
       hard: ["Find Duplicate File in System", "Maximum Gap (radix variant)"],
+    },
+    "Bubble Sort": {
+      easy: ["Sort an Array", "Sort Colors"],
+      medium: ["Largest Number (ordering intuition)", "Sort List"],
+      hard: ["Minimum Number of Operations to Make Array Continuous"],
+    },
+    "Selection Sort": {
+      easy: ["Sort an Array", "Third Maximum Number"],
+      medium: ["Kth Largest Element in an Array", "Wiggle Sort II"],
+      hard: ["Find the Kth Largest Integer in the Array"],
+    },
+    "Heap Sort": {
+      easy: ["Kth Largest Element in an Array", "Last Stone Weight"],
+      medium: ["Sort an Array", "Top K Frequent Elements"],
+      hard: ["Find Median from Data Stream", "IPO"],
+    },
+    "Radix Sort": {
+      easy: ["Maximum Gap", "Relative Sort Array"],
+      medium: ["Sort an Array (non-negative keys)", "Largest Number"],
+      hard: ["Maximum Gap (bucket view)", "Find the Kth Largest Integer in the Array"],
     },
     "BFS": {
       easy: ["Binary Tree Level Order Traversal", "Flood Fill", "Number of Islands"],
@@ -734,6 +755,7 @@ export function ResultCard({ result, onReset, getCodeVariants, renderHighlighted
       {result.name === "HashMap" ? <HashMapVisualizer /> : null}
       {result.name === "PriorityQueue" ? <PriorityQueueVisualizer /> : null}
       {result.name === "Red-Black Tree (via TreeMap/TreeSet)" ? <RedBlackTreeVisualizer /> : null}
+      {SORTING_VISUALIZER_NAMES.has(result.name) ? <SortingVisualizer algorithmName={result.name} /> : null}
       <button className="ghost-btn center-btn" onClick={onReset}>
         Start over
       </button>

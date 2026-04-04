@@ -5,7 +5,6 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 export function DequeVisualizer() {
   const [deque, setDeque] = useState([6, 3, 8, 1]);
-  const [window, setWindow] = useState([6, 8, 9, 7, 3]);
   const [inputVal, setInputVal] = useState("");
   const [animating, setAnimating] = useState(false);
   const [activeIdxSet, setActiveIdxSet] = useState(new Set());
@@ -146,20 +145,29 @@ export function DequeVisualizer() {
           <p className="deque-viz-status">{status}</p>
 
           <div className="deque-track-wrap">
-            <span className="deque-end-tag">front</span>
             <div className="deque-track">
               {deque.length === 0 ? (
                 <div className="queue-empty-msg">Deque is empty</div>
               ) : (
-                deque.map((v, i) => (
-                  <div key={i}
-                    className={`deque-cell ${activeIdxSet.has(i) ? "active" : ""} ${i === 0 ? "front" : ""} ${i === deque.length - 1 ? "rear" : ""}`}>
-                    {v}
-                  </div>
-                ))
+                deque.map((v, i) => {
+                  const isFront = i === 0;
+                  const isRear = i === deque.length - 1;
+                  return (
+                    <div key={`${i}-${v}-${deque.length}`} className="deque-cell-column">
+                      <div className="deque-tag-row" aria-hidden={!isFront && !isRear}>
+                        {isFront ? <span className="deque-end-tag">front</span> : null}
+                        {isRear ? <span className="deque-end-tag deque-end-tag-rear">rear</span> : null}
+                      </div>
+                      <div
+                        className={`deque-cell ${activeIdxSet.has(i) ? "active" : ""} ${isFront ? "front" : ""} ${isRear ? "rear" : ""}`}
+                      >
+                        {v}
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
-            <span className="deque-end-tag">rear</span>
           </div>
         </>
       )}
