@@ -55,16 +55,29 @@ export function useDecisionTreeNavigation(sections, initialSectionKey) {
     }, 120);
   }, [path]);
 
-  // Jump to any breadcrumb step (complete backtracking)
+  // Jump to a breadcrumb step: each entry stores { label, node } where `node` is the parent *before* that choice.
+  // We must apply the chosen option to land on the correct screen (option.next or option.result).
   const jumpToPathIndex = useCallback(
     (targetIndex) => {
       if (targetIndex < 0 || targetIndex >= path.length) return;
       setAnimating(true);
       setTimeout(() => {
-        const nextPath = path.slice(0, targetIndex);
+        const item = path[targetIndex];
+        const parentNode = item.node;
+        const option = parentNode?.options?.find((o) => o.label === item.label);
+        if (!option) {
+          setAnimating(false);
+          return;
+        }
+        const nextPath = path.slice(0, targetIndex + 1);
         setPath(nextPath);
-        setCurrentNode(path[targetIndex].node);
-        setResult(null);
+        if (option.result) {
+          setResult(option.result);
+          setCurrentNode(parentNode);
+        } else if (option.next) {
+          setResult(null);
+          setCurrentNode(option.next);
+        }
         setAnimating(false);
       }, 120);
     },

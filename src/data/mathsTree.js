@@ -1,3 +1,299 @@
-// Reserved module for Maths tree extraction.
-// The active tree is still owned by App.jsx during phased refactor.
-export const MATH_TREE = null;
+import { JAVA_SNIPPETS } from './javaSnippets.js';
+
+export const MATH_TREE = {
+  id: "math-root",
+  icon: "📐",
+  question: "Which math area do you want to revise quickly?",
+  options: [
+    {
+      label: "Number Theory Essentials",
+      next: {
+        id: "math-number-theory",
+        icon: "🔢",
+        question: "Pick a number theory tool",
+        options: [
+          {
+            label: "GCD / LCM",
+            result: {
+              name: "GCD and LCM",
+              pkg: "Number Theory",
+              whenToUse: "Use for divisibility, ratio simplification, periodic events, and fractions.",
+              why: "GCD solves common factors quickly; LCM gives first common multiple for cycle alignment.",
+              complexity: { gcd: "O(log min(a,b))", lcm: "O(log min(a,b))" },
+              tradeoffs: "Use long to avoid overflow in LCM multiplication.",
+              javaCode: JAVA_SNIPPETS.gcdLcm,
+              color: "#0284c7",
+            },
+          },
+          {
+            label: "Extended Euclid",
+            result: {
+              name: "Extended Euclidean Algorithm",
+              pkg: "Number Theory",
+              whenToUse: "Use when you need coefficients x,y such that ax + by = gcd(a,b).",
+              why: "Builds Bezout coefficients and enables modular inverse for non-prime mod in valid cases.",
+              complexity: { time: "O(log min(a,b))", space: "O(log min(a,b)) recursion" },
+              tradeoffs: "Inverse exists only when gcd(a,mod)=1.",
+              javaCode: JAVA_SNIPPETS.extendedEuclid,
+              color: "#0284c7",
+            },
+          },
+          {
+            label: "Fast Power / Modular Inverse",
+            result: {
+              name: "Binary Exponentiation + Fermat Inverse",
+              pkg: "Modular Arithmetic",
+              whenToUse: "Use for huge powers, modular combinations, hashing, and inverses under prime mod.",
+              why: "Exponentiation by squaring reduces linear power time to logarithmic.",
+              complexity: { modPow: "O(log e)", modInversePrime: "O(log mod)" },
+              tradeoffs: "Fermat inverse requires prime modulus and non-zero base modulo mod.",
+              codeVariants: [
+                { title: "Fast power", code: JAVA_SNIPPETS.modPow },
+                { title: "Inverse (prime mod)", code: JAVA_SNIPPETS.modInverseFermat },
+              ],
+              javaCode: JAVA_SNIPPETS.modPow,
+              color: "#0284c7",
+            },
+          },
+        ],
+      },
+    },
+    {
+      label: "Primes and Factorization",
+      next: {
+        id: "math-prime",
+        icon: "🧪",
+        question: "Choose prime processing method",
+        options: [
+          {
+            label: "Many prime queries up to N",
+            result: {
+              name: "Sieve of Eratosthenes",
+              pkg: "Prime Preprocessing",
+              whenToUse: "Use when multiple primality checks are needed in range [1..N].",
+              why: "One preprocessing pass gives O(1) primality lookup per value.",
+              complexity: { preprocess: "O(N log log N)", query: "O(1)", space: "O(N)" },
+              tradeoffs: "Memory heavy for huge N; segmented sieve is better for very large ranges.",
+              javaCode: JAVA_SNIPPETS.sieve,
+              color: "#16a34a",
+            },
+          },
+          {
+            label: "Prime factors of one/few numbers",
+            result: {
+              name: "Trial Division Factorization",
+              pkg: "Prime Factorization",
+              whenToUse: "Use when factoring a small number of values and constraints are moderate.",
+              why: "Dividing by candidates up to sqrt(n) gives exact prime exponents.",
+              complexity: { time: "O(sqrt(n))", space: "O(number of prime factors)" },
+              tradeoffs: "For many factorization queries, precompute SPF array instead.",
+              javaCode: JAVA_SNIPPETS.primeFactorization,
+              color: "#16a34a",
+            },
+          },
+        ],
+      },
+    },
+    {
+      label: "Combinatorics and Counting",
+      next: {
+        id: "math-comb",
+        icon: "🧮",
+        question: "What counting style do you need?",
+        options: [
+          {
+            label: "nCr under large modulo",
+            result: {
+              name: "nCr mod prime",
+              pkg: "Combinatorics",
+              whenToUse: "Use in counting problems with large values where exact factorials overflow.",
+              why: "Factorials with modular inverse compute combinations efficiently.",
+              complexity: { precomputeFact: "O(n)", each_nCr: "O(log mod)", space: "O(n)" },
+              tradeoffs: "This version assumes prime mod; non-prime requires other methods.",
+              javaCode: JAVA_SNIPPETS.nCrModPrime,
+              color: "#7c3aed",
+            },
+          },
+          {
+            label: "Count union of overlapping sets",
+            result: {
+              name: "Inclusion-Exclusion Principle",
+              pkg: "Counting",
+              whenToUse: "Use when counting elements satisfying at least one of multiple conditions.",
+              why: "Adds single sets, subtracts pair overlaps, then adds triple overlaps, etc.",
+              complexity: { time: "O(2^k) for k sets", space: "O(1) to O(2^k)" },
+              tradeoffs: "Scales poorly if conditions are too many.",
+              javaCode: JAVA_SNIPPETS.inclusionExclusion,
+              color: "#7c3aed",
+            },
+          },
+        ],
+      },
+    },
+    {
+      label: "Matrix and Recurrence Math",
+      result: {
+        name: "Matrix Exponentiation",
+        pkg: "Linear Recurrences",
+        whenToUse: "Use for recurrences like Fibonacci where transitions are linear and n is huge.",
+        why: "Raises transition matrix in O(log n), far faster than O(n) DP for large n.",
+        complexity: { matrixMul: "O(k^3)", exponentiation: "O(k^3 log n)", space: "O(k^2)" },
+        tradeoffs: "Constant factors are higher; only worth it when n is large.",
+        javaCode: JAVA_SNIPPETS.matrixExpoFib,
+        color: "#0f766e",
+      },
+    },
+    {
+      label: "Geometry basics for DSA/interviews",
+      result: {
+        name: "Orientation and Cross Product",
+        pkg: "Computational Geometry",
+        whenToUse: "Use in segment intersection, convex hull, polygon winding, and turn direction checks.",
+        why: "Cross product sign gives clockwise/counterclockwise/collinear instantly.",
+        complexity: { oneCheck: "O(1)", segmentIntersection: "O(1) per pair" },
+        tradeoffs: "Use long for coordinate products to avoid overflow.",
+        javaCode: JAVA_SNIPPETS.geometryOrientation,
+        color: "#ea580c",
+      },
+    },
+    {
+      label: "Bitwise math tricks",
+      next: {
+        id: "math-bitwise-detailed",
+        icon: "🧠",
+        question: "Which bit manipulation pattern do you want to revise?",
+        options: [
+          {
+            label: "Core bit operations (set/clear/toggle/test)",
+            result: {
+              name: "Bit Basics",
+              pkg: "Bit Manipulation",
+              whenToUse: "Use whenever you need fast boolean flags or compact state storage.",
+              why: "Single integer operations replace loops/arrays for many tiny-state tasks.",
+              complexity: { eachOp: "O(1)", space: "O(1)" },
+              tradeoffs: "Easy to introduce bugs with wrong shift index/precedence.",
+              codeVariants: [
+                { title: "Core operations", code: JAVA_SNIPPETS.bitBasicsOps },
+                { title: "Power and low-bit checks", code: JAVA_SNIPPETS.bitPowerChecks },
+              ],
+              javaCode: JAVA_SNIPPETS.bitBasicsOps,
+              color: "#be123c",
+            },
+          },
+          {
+            label: "XOR tricks (single/two unique numbers)",
+            result: {
+              name: "XOR Cancellation Patterns",
+              pkg: "Bit Manipulation",
+              whenToUse: "Use when pairs cancel and only one/two unique values remain.",
+              why: "x ^ x = 0 and x ^ 0 = x enables elegant linear solutions.",
+              complexity: { time: "O(n)", space: "O(1)" },
+              tradeoffs: "Requires strict duplicate frequency assumptions.",
+              codeVariants: [
+                { title: "Single unique", code: JAVA_SNIPPETS.bitUniqueWithXor },
+                { title: "Two uniques", code: JAVA_SNIPPETS.bitTwoUniques },
+              ],
+              javaCode: JAVA_SNIPPETS.bitUniqueWithXor,
+              color: "#be123c",
+            },
+          },
+          {
+            label: "Subset masks and submask iteration",
+            result: {
+              name: "Mask Enumeration Tricks",
+              pkg: "Bitmask Techniques",
+              whenToUse: "Use in subset DP, combinational states, and feature-selection problems.",
+              why: "Bitmasks compactly represent subsets and support fast transitions.",
+              complexity: { allSubsets: "O(2^n)", submasksOfMask: "O(2^k)", memory: "O(1)" },
+              tradeoffs: "Only practical for small n (typically <= 22).",
+              codeVariants: [
+                { title: "Submask iteration", code: JAVA_SNIPPETS.bitSubmaskIteration },
+                { title: "SOS DP idea", code: JAVA_SNIPPETS.bitSupersetDp },
+              ],
+              javaCode: JAVA_SNIPPETS.bitSubmaskIteration,
+              color: "#be123c",
+            },
+          },
+          {
+            label: "Bit DP/counting utilities",
+            result: {
+              name: "Count Bits / Prefix Bit Info",
+              pkg: "Bit DP",
+              whenToUse: "Use when problems depend on set-bit counts for many numbers.",
+              why: "Recurrence dp[i] = dp[i>>1] + (i&1) gives linear preprocessing.",
+              complexity: { preprocess: "O(n)", eachQuery: "O(1)" },
+              tradeoffs: "For huge ranges, consider mathematical counting by bit positions.",
+              javaCode: JAVA_SNIPPETS.bitCountBits,
+              color: "#be123c",
+            },
+          },
+          {
+            label: "Maximum XOR and binary trie",
+            result: {
+              name: "Bit Trie for XOR Optimization",
+              pkg: "Advanced Bit Structures",
+              whenToUse: "Use for max XOR pair/subarray queries.",
+              why: "Greedy opposite-bit traversal maximizes XOR value bit-by-bit.",
+              complexity: { insert: "O(B)", query: "O(B)", total: "O(n*B)", B: "32 for int" },
+              tradeoffs: "Higher constant and memory than hash-based methods.",
+              javaCode: JAVA_SNIPPETS.bitTrieMaxXor,
+              color: "#be123c",
+            },
+          },
+          {
+            label: "Range bitwise AND trick",
+            result: {
+              name: "Common Prefix Bit Trick",
+              pkg: "Bitwise Range Operations",
+              whenToUse: "Use for range bitwise AND over [L, R].",
+              why: "Only common leading bits survive; shifting to common prefix is fastest.",
+              complexity: { time: "O(log(max(L,R)))", space: "O(1)" },
+              tradeoffs: "Pattern is specific to AND; does not directly transfer to OR/XOR.",
+              javaCode: JAVA_SNIPPETS.bitAndRange,
+              color: "#be123c",
+            },
+          },
+          {
+            label: "Quick cheatsheet of common bit tricks",
+            result: {
+              name: "Bit Manipulation Cheatsheet",
+              pkg: "Revision Summary",
+              whenToUse: "Use before contests/interviews as a memory refresher.",
+              why: "Groups highest-frequency bit hacks in one place.",
+              complexity: { operations: "Mostly O(1)", subsetLoops: "Exponential in bits" },
+              tradeoffs: "Cheatsheet helps recall but always verify constraints/edge cases.",
+              javaCode: JAVA_SNIPPETS.bitMath,
+              color: "#be123c",
+            },
+          },
+        ],
+      },
+    },
+    {
+      label: "Prefix/Suffix math tricks",
+      result: {
+        name: "Prefix Sum Transform",
+        pkg: "Array Math Transform",
+        whenToUse: "Use when many range sum queries exist on immutable data.",
+        why: "Converts O(n) per query to O(1) via cumulative preprocessing.",
+        complexity: { preprocess: "O(n)", query: "O(1)", space: "O(n)" },
+        tradeoffs: "If updates are frequent, use Fenwick/Segment tree instead.",
+        javaCode: JAVA_SNIPPETS.prefixSumMath,
+        color: "#2563eb",
+      },
+    },
+    {
+      label: "Probability and expectation",
+      result: {
+        name: "Expected Value DP-style Setup",
+        pkg: "Probability Math",
+        whenToUse: "Use when asked expected number of steps/cost under random transitions.",
+        why: "Linearity of expectation converts random process to deterministic recurrence.",
+        complexity: { states: "n", transition: "outcomes per state", total: "O(n * outcomes)" },
+        tradeoffs: "Floating point precision and equation setup need care.",
+        javaCode: JAVA_SNIPPETS.expectedValueDice,
+        color: "#4f46e5",
+      },
+    },
+  ],
+};

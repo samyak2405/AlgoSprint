@@ -16,6 +16,7 @@ import { HashMapVisualizer } from "./HashMapVisualizer";
 import { PriorityQueueVisualizer } from "./PriorityQueueVisualizer";
 import { RedBlackTreeVisualizer } from "./RedBlackTreeVisualizer";
 import { SortingVisualizer, SORTING_VISUALIZER_NAMES } from "./SortingVisualizer";
+import { GraphAlgorithmVisualizer, GRAPH_VIZ_NAMES } from "./GraphAlgorithmVisualizer";
 
 function getProblemLadder(result) {
   const byName = {
@@ -217,6 +218,11 @@ function getProblemLadder(result) {
       medium: ["Word Ladder", "Rotting Oranges", "Shortest Path in Binary Matrix"],
       hard: ["Shortest Path to Get All Keys", "Jump Game IV", "Word Ladder II"],
     },
+    "Multi-Source BFS": {
+      easy: ["01 Matrix", "Map of Highest Peak", "Rotting Oranges"],
+      medium: ["Walls and Gates", "Shortest Distance from All Buildings", "Nearest Exit from Entrance in Maze"],
+      hard: ["Minimum Cost to Make at Least One Valid Path in a Grid", "Escape a Large Maze"],
+    },
     "Dijkstra": {
       easy: ["Network Delay Time (starter)"],
       medium: ["Network Delay Time", "Path With Minimum Effort", "Cheapest Flights Within K Stops"],
@@ -226,6 +232,51 @@ function getProblemLadder(result) {
       easy: ["Network Delay Time (Bellman-Ford variant)"],
       medium: ["Cheapest Flights Within K Stops", "Find the City With the Smallest Number of Neighbors"],
       hard: ["Minimum Cost to Reach Destination in Time", "Minimum Number of Days to Disconnect Island"],
+    },
+    "DFS": {
+      easy: ["Number of Islands", "Flood Fill", "Max Area of Island"],
+      medium: ["Pacific Atlantic Water Flow", "Surrounded Regions", "Course Schedule II (DFS order)"],
+      hard: ["Word Search II", "Remove Invalid Parentheses", "Critical Connections in a Network"],
+    },
+    "Bidirectional BFS": {
+      easy: ["Word Ladder (bi-BFS friendly)"],
+      medium: ["Word Ladder", "Sliding Puzzle", "Open the Lock"],
+      hard: ["Word Ladder II", "Cut Off Trees for Golf Event"],
+    },
+    "Floyd-Warshall": {
+      easy: ["Find the City With the Smallest Number of Neighbors (Floyd variant)"],
+      medium: ["Course Schedule IV", "Network Delay Time (all-pairs on small n)"],
+      hard: ["Find the Shortest Superstring", "Path With Minimum Effort (compare with FW on tiny graphs)"],
+    },
+    "Topological Sort (Kahn)": {
+      easy: ["Find All Possible Recipes From Given Supplies", "Course Schedule"],
+      medium: ["Course Schedule II", "Sequence Reconstruction", "Alien Dictionary"],
+      hard: ["Parallel Courses III", "Sort Items by Groups Respecting Dependencies"],
+    },
+    "Kruskal (MST)": {
+      easy: ["Min Cost to Connect All Points (Kruskal)"],
+      medium: ["Connecting Cities With Minimum Cost", "Find Critical and Pseudo-Critical Edges in MST"],
+      hard: ["Minimum Cost to Connect Two Groups of Points", "Recover a Secret From Random Triplets (graph view)"],
+    },
+    "Prim (MST)": {
+      easy: ["Min Cost to Connect All Points (Prim)"],
+      medium: ["Connecting Cities With Minimum Cost", "Optimize Water Distribution in a Village"],
+      hard: ["Minimum Cost to Connect Two Groups of Points", "Find Critical and Pseudo-Critical Edges in MST"],
+    },
+    "Johnson (APSP)": {
+      easy: ["Course Schedule IV (small dense)"],
+      medium: ["Network Delay Time (Johnson mindset on sparse graphs)"],
+      hard: ["Arbitrary all-pairs with negative edges (Johnson / FW tradeoffs)"],
+    },
+    "A* (A-Star)": {
+      easy: ["Shortest Path in Binary Matrix (heuristic)"],
+      medium: ["Path With Minimum Effort", "Swim in Rising Water"],
+      hard: ["Sequence Alignment (A* / DP hybrids)", "K Shortest Paths"],
+    },
+    "Tarjan (SCC)": {
+      easy: ["Find Eventual Safe States"],
+      medium: ["Critical Connections in a Network", "Accounts Merge (SCC rarely)"],
+      hard: ["Satisfiability of Equality Equations", "Minimum Cost to Reach Destination in Time (SCC compress)"],
     },
     "KMP (Knuth-Morris-Pratt)": {
       easy: ["Find the Index of the First Occurrence in a String"],
@@ -681,6 +732,32 @@ export function ResultCard({ result, onReset, getCodeVariants, renderHighlighted
       <p>
         <strong>Pitfalls/alternatives:</strong> {result.tradeoffs}
       </p>
+      {result.extendedDetail ? (
+        <div className="result-extended">
+          {result.extendedDetail.overview ? (
+            <div className="result-extended-overview">
+              <h3 className="result-extended-overview-heading">{result.extendedDetail.overview.heading}</h3>
+              {result.extendedDetail.overview.paragraphs.map((para, i) => (
+                <p key={i} className="result-extended-overview-p">
+                  {para}
+                </p>
+              ))}
+            </div>
+          ) : null}
+          <h3>{result.extendedDetail.title}</h3>
+          <ol className="result-extended-steps">
+            {result.extendedDetail.steps.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+          {result.extendedDetail.formula ? (
+            <p className="result-extended-formula">
+              <strong>Recovery:</strong> <code>{result.extendedDetail.formula}</code>
+            </p>
+          ) : null}
+          {result.extendedDetail.note ? <p className="result-extended-note muted">{result.extendedDetail.note}</p> : null}
+        </div>
+      ) : null}
       <div className="code-header">
         <h3>Java code</h3>
       </div>
@@ -756,6 +833,7 @@ export function ResultCard({ result, onReset, getCodeVariants, renderHighlighted
       {result.name === "PriorityQueue" ? <PriorityQueueVisualizer /> : null}
       {result.name === "Red-Black Tree (via TreeMap/TreeSet)" ? <RedBlackTreeVisualizer /> : null}
       {SORTING_VISUALIZER_NAMES.has(result.name) ? <SortingVisualizer algorithmName={result.name} /> : null}
+      {GRAPH_VIZ_NAMES.has(result.name) ? <GraphAlgorithmVisualizer algorithm={result.name} /> : null}
       <button className="ghost-btn center-btn" onClick={onReset}>
         Start over
       </button>
