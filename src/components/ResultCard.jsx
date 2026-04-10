@@ -716,6 +716,12 @@ export function ResultCard({ result, onReset, getCodeVariants, renderHighlighted
       </span>
       <h2>{result.name}</h2>
       <p className="pkg">{result.pkg}</p>
+      {result.description && (
+        <div className="result-description">
+          <h3 className="result-description-heading">What is it?</h3>
+          <p>{result.description}</p>
+        </div>
+      )}
       <p>
         <strong>When to use:</strong> {result.whenToUse}
       </p>
@@ -732,6 +738,16 @@ export function ResultCard({ result, onReset, getCodeVariants, renderHighlighted
       <p>
         <strong>Pitfalls/alternatives:</strong> {result.tradeoffs}
       </p>
+      {result.pseudocode && result.pseudocode.length > 0 && (
+        <div className="result-pseudocode">
+          <h3 className="result-pseudocode-heading">Pseudocode</h3>
+          <ol className="result-pseudocode-steps">
+            {result.pseudocode.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </div>
+      )}
       {result.extendedDetail ? (
         <div className="result-extended">
           {result.extendedDetail.overview ? (

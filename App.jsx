@@ -24,6 +24,34 @@ import { MISTAKES_CATALOG } from "./src/data/mistakesCatalog";
 import { useKeyboardNavigation } from "./src/hooks/useKeyboardNavigation";
 
 export default function App() {
+  const BASE_URL = import.meta.env.BASE_URL || "/";
+  const SIMULATOR_URL =
+    import.meta.env.VITE_SIMULATOR_URL || `${BASE_URL}system-design-simulator/`;
+
+  const getAreaFromLocation = useCallback(() => {
+    // Works with Vite base (e.g. BASE_URL="/AlgoSprint/")
+    const raw = window.location.pathname || "/";
+    const rel = raw.startsWith(BASE_URL) ? `/${raw.slice(BASE_URL.length)}` : raw;
+    const pathOnly = rel.replace(/\/+$/, "") || "/";
+
+    if (pathOnly === "/system-design") return "systemDesign";
+    if (pathOnly === "/dsa") return "dsa";
+    return "hub";
+  }, [BASE_URL]);
+
+  const [siteArea, setSiteArea] = useState(() => getAreaFromLocation()); // hub | dsa | systemDesign
+
+  const navigate = useCallback(
+    (area) => {
+      const path =
+        area === "systemDesign" ? "system-design" : area === "dsa" ? "dsa" : "";
+      const nextUrl = `${BASE_URL}${path}`;
+      window.history.pushState({}, "", nextUrl);
+      setSiteArea(area);
+    },
+    [BASE_URL]
+  );
+
   const {
     currentSection,
     sectionMeta,
@@ -74,9 +102,130 @@ export default function App() {
     onTogglePalette: () => setPaletteOpen((v) => !v),
   });
 
+  useEffect(() => {
+    const onPopState = () => setSiteArea(getAreaFromLocation());
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [getAreaFromLocation]);
+
+  if (siteArea === "hub") {
+    return (
+      <div className="page">
+        <div className="container">
+          <header className="header">
+            <span className="eyebrow">AlgoSprint · Learning Hub</span>
+            <h1>DSA · HLD · LLD · OOPs</h1>
+            <p className="subtext">
+              One place to jump into DSA revision, system design practice, and more.
+            </p>
+          </header>
+
+          <div className="hub-grid">
+            <div className="hub-card">
+              <div className="hub-card-top">
+                <h2 className="hub-card-title">DSA</h2>
+                <p className="hub-card-desc">
+                  Decision trees, patterns, visualizers, complexity, and code snippets.
+                </p>
+              </div>
+              <button className="ghost-btn hub-card-cta" onClick={() => navigate("dsa")}>
+                Open DSA
+              </button>
+            </div>
+
+            <div className="hub-card">
+              <div className="hub-card-top">
+                <h2 className="hub-card-title">HLD</h2>
+                <p className="hub-card-desc">
+                  High Level Design hub: theory + simulator.
+                </p>
+              </div>
+              <button className="ghost-btn hub-card-cta" onClick={() => navigate("systemDesign")}>
+                Open System Design
+              </button>
+            </div>
+
+            <div className="hub-card hub-card-disabled">
+              <div className="hub-card-top">
+                <h2 className="hub-card-title">LLD</h2>
+                <p className="hub-card-desc">Low Level Design content (coming soon).</p>
+              </div>
+              <button className="ghost-btn hub-card-cta" disabled>
+                Coming soon
+              </button>
+            </div>
+
+            <div className="hub-card hub-card-disabled">
+              <div className="hub-card-top">
+                <h2 className="hub-card-title">OOPs</h2>
+                <p className="hub-card-desc">OOP concepts and examples (coming soon).</p>
+              </div>
+              <button className="ghost-btn hub-card-cta" disabled>
+                Coming soon
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (siteArea === "systemDesign") {
+    return (
+      <div className="page">
+        <div className="container">
+          <div className="hub-back-row">
+            <button className="ghost-btn" onClick={() => navigate("hub")}>
+              ← Back to Hub
+            </button>
+          </div>
+
+          <header className="header">
+            <span className="eyebrow">AlgoSprint · System Design</span>
+            <h1>High Level Design (HLD)</h1>
+            <p className="subtext">
+              Start with fundamentals, then practice with the simulator.
+            </p>
+          </header>
+
+          <div className="hub-grid">
+            <div className="hub-card">
+              <div className="hub-card-top">
+                <h2 className="hub-card-title">Theory</h2>
+                <p className="hub-card-desc">
+                  Concepts, trade-offs, and patterns (coming soon in this site).
+                </p>
+              </div>
+              <button className="ghost-btn hub-card-cta" disabled>
+                Coming soon
+              </button>
+            </div>
+
+            <div className="hub-card">
+              <div className="hub-card-top">
+                <h2 className="hub-card-title">Simulator</h2>
+                <p className="hub-card-desc">
+                  Open the System Design Simulator app to practice HLD problems.
+                </p>
+              </div>
+              <a className="ghost-btn hub-card-cta" href={SIMULATOR_URL}>
+                Open Simulator
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <div className="container">
+        <div className="hub-back-row">
+          <button className="ghost-btn" onClick={() => navigate("hub")}>
+            ← Back to Hub
+          </button>
+        </div>
         <Header />
         <div className="objective-toggle-row">
           <div className="objective-toggle-left">

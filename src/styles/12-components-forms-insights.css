@@ -79,6 +79,70 @@
   color: var(--color-primary);
 }
 
+/* ── Hub (DSA / HLD / LLD / OOPs) ───────────────────────────── */
+.hub-back-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: var(--sp-3);
+}
+
+.hub-grid {
+  margin-top: var(--sp-5);
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: var(--sp-4);
+}
+
+.hub-card {
+  grid-column: span 6;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  min-height: 180px;
+}
+
+.hub-card-top {
+  flex: 1;
+}
+
+.hub-card-title {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.hub-card-desc {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.hub-card-cta {
+  margin-top: var(--sp-4);
+  width: fit-content;
+}
+
+.hub-card-footnote {
+  margin: var(--sp-3) 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--text-sm);
+}
+
+.hub-card-disabled {
+  opacity: 0.75;
+}
+
+@media (max-width: 820px) {
+  .hub-card {
+    grid-column: span 12;
+  }
+}
+
 .mode-btn.active {
   background: var(--gradient-brand);
   border-color: transparent;
