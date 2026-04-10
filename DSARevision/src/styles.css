@@ -1,0 +1,35 @@
+/* ============================================================
+   ALGOSPRINT — DESIGN SYSTEM
+   Inspired by Linear · Stripe · Notion
+   ============================================================
+   Modular styles live in src/styles/*.css (import order matters).
+
+   Index
+   01  Design tokens, themes, system preference (fonts + @import url)
+   02  Reset & base typography helpers
+   03  Layout shell: header, objective row, section tabs, panel, breadcrumbs
+   04  Decision tree — questions & options
+   05  Result card & code / syntax highlighting
+   06  Visualizers: DP, heap, HashMap, RBT
+   07  Shared visualizer helpers + Array visualizer
+   08  Sorting visualizer (+ bars, step log, quick tree)
+   09  Merge sort boxed recursion tree
+   10  Graph algorithm visualizer
+   11  Classic DS visualizers (stack, queue, … two heaps)
+   12  Feature cards, buttons, forms, search, problem ladder, insights
+   13  Transitions, responsive, utilities
+   ============================================================ */
+
+@import "./styles/01-tokens.css";
+@import "./styles/02-base.css";
+@import "./styles/03-layout-shell.css";
+@import "./styles/04-decision-tree.css";
+@import "./styles/05-result-and-code.css";
+@import "./styles/06-visualizers-dp-heap-hash-rbt.css";
+@import "./styles/07-visualizers-shared-and-array.css";
+@import "./styles/08-visualizers-sorting.css";
+@import "./styles/09-visualizers-merge-tree.css";
+@import "./styles/10-visualizers-graph.css";
+@import "./styles/11-visualizers-classic-ds.css";
+@import "./styles/12-components-forms-insights.css";
+@import "./styles/13-responsive-and-utilities.css";
