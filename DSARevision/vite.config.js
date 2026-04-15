@@ -23,10 +23,18 @@ const proxyConfig = {
     ws: true,
     rewrite: (path) => path.replace(/^\/AlgoSprint\/lld/, "/AlgoSprint/lld"),
   },
+  // Multithreading & Concurrency subapp (Vite)
+  // MT_TARGET env var lets Docker use the service name; falls back to localhost for local dev
+  "/AlgoSprint/multithreading": {
+    target: process.env.MT_TARGET || "http://localhost:4003",
+    changeOrigin: true,
+    ws: true,
+    rewrite: (path) => path.replace(/^\/AlgoSprint\/multithreading/, "/AlgoSprint/multithreading"),
+  },
 };
 
 export default defineConfig({
-  base: "/AlgoSprint/",
+  base: process.env.VITE_BASE_URL || "/AlgoSprint/",
   server: {
     proxy: proxyConfig,
   },

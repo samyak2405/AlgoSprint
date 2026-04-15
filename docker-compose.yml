@@ -7,9 +7,11 @@ services:
     environment:
       - SD_TARGET=http://system-design:3000
       - LLD_TARGET=http://lld:4002
+      - MT_TARGET=http://multithreading:4003
     depends_on:
       - system-design
       - lld
+      - multithreading
     restart: unless-stopped
 
   system-design:
@@ -24,4 +26,11 @@ services:
       context: ./LLDDesign
     ports:
       - "4002:4002"
+    restart: unless-stopped
+
+  multithreading:
+    build:
+      context: ./MultithreadingConcurrency
+    ports:
+      - "4003:4003"
     restart: unless-stopped

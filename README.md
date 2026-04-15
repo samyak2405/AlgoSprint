@@ -11,9 +11,9 @@
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docker.com)
 [![Tailwind](https://img.shields.io/badge/Tailwind_v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 
-**Master DSA · Design Patterns · System Design — all in one place.**
+**Master DSA · Design Patterns · System Design · Multithreading — all in one place.**
 
-[DSA Revision](#-dsarevision--dsa--algorithms-hub) · [LLD Design](#-llddesign--low-level-design) · [System Design](#-systemdesign--system-design-simulator) · [Quick Start](#-quick-start) · [Docker Deploy](#-docker-deployment)
+[DSA Revision](#-dsarevision--dsa--algorithms-hub) · [LLD Design](#-llddesign--low-level-design) · [System Design](#-systemdesign--system-design-simulator) · [Multithreading](#-multithreadingconcurrency--java-concurrency) · [Quick Start](#-quick-start) · [Docker Deploy](#-docker-deployment)
 
 </div>
 
@@ -21,13 +21,14 @@
 
 ## What is AlgoSprint?
 
-AlgoSprint is a **monorepo of three focused, interactive web applications** built to replace passive reading with active, high-retention interview prep. Each app targets a distinct interview domain:
+AlgoSprint is a **monorepo of four focused, interactive web applications** built to replace passive reading with active, high-retention interview prep. Each app targets a distinct interview domain:
 
 | App | Domain | Tech | Port |
 |-----|--------|------|------|
 | [DSARevision](#-dsarevision--dsa--algorithms-hub) | Data Structures & Algorithms | React 18 + Vite | `5173` (dev) / `4173` (prod) |
 | [LLDDesign](#-llddesign--low-level-design) | Low Level Design & Design Patterns | React 18 + Vite | `3002` (dev) / `4002` (prod) |
 | [SystemDesign](#-systemdesign--system-design-simulator) | System Design Simulator | Next.js 16 + TypeScript | `3000` |
+| [MultithreadingConcurrency](#-multithreadingconcurrency--java-concurrency) | Java Multithreading & Concurrency | React 18 + Vite | `3003` (dev) / `4003` (prod) |
 
 ---
 
@@ -182,6 +183,49 @@ Score verdicts: `Needs Work` (<31) · `Decent` (<51) · `Good` (<71) · `Excelle
 
 ---
 
+## MultithreadingConcurrency — Java Concurrency
+
+A deep-dive interactive reference for Java multithreading and concurrency interviews. Covers the full thread lifecycle, the Java Memory Model, `java.util.concurrent`, classic concurrency patterns, and LeetCode-style threading problems — all with animated visualizers that make invisible CPU-level behaviour visible.
+
+### Sections
+
+| # | Section | Description |
+|---|---------|-------------|
+| 01 | **Concepts** | Thread lifecycle, Java Memory Model & happens-before, `synchronized`, `volatile`, deadlock, race condition, livelock & starvation |
+| 02 | **Java API** | Full `java.util.concurrent` reference — `ExecutorService`, `CompletableFuture`, `CountDownLatch`, `CyclicBarrier`, `Semaphore`, `BlockingQueue`, `ConcurrentHashMap`, atomic classes, `ReentrantLock`, `ReadWriteLock`, `ThreadLocal` |
+| 03 | **Patterns** | Thread Pool, Producer-Consumer, Monitor Object, Read-Write Lock, Two-Phase Termination, Fork-Join |
+| 04 | **Problems** | 8 problems including LC 1114–1226 series (Print in Order, FooBar, H2O, Dining Philosophers, Bounded Queue) + Readers-Writers |
+| 05 | **Revision** | Scannable quick-reference cards filterable by category (Synchronization, Executor, Lock, Collection, Atomic) |
+
+### Interactive Visualizers
+
+Every key concept ships with a frame-by-frame animated visualizer — no external animation libraries, pure React + CSS + SVG.
+
+| Visualizer | What it shows |
+|-----------|---------------|
+| `ThreadLifecycleViz` | SVG state machine stepping through NEW → RUNNABLE → BLOCKED / WAITING / TIMED_WAITING → TERMINATED with labelled transitions |
+| `DeadlockViz` | Two tabs — circular wait forming in real time vs. the lock-ordering fix; animated dashed arrows for "wants" and solid arrows for "holds" |
+| `RaceConditionViz` | Two tabs — LOAD / INC / STORE interleaving that causes a lost update vs. the `AtomicInteger` CAS fix |
+| `JMMViz` | Two tabs — stale CPU cache read when `volatile` is absent vs. immediate main-memory flush when it's present |
+| `ProducerConsumerViz` | Bounded buffer with producer blocking on FULL and consumer blocking on EMPTY; live fill-level bar |
+| `SemaphoreViz` | 3-permit semaphore, 5 competing threads — acquire / block / release / wake-up cycle |
+| `CountDownLatchViz` | 3 worker threads counting down from 3 → 0; aggregator thread unblocks when latch opens |
+| `ThreadPoolViz` | Two tabs — normal worker reuse flow vs. queue overflow triggering `RejectedExecutionException` |
+
+All visualizers share a common `VizControls` bar: **Play / Pause · Step · Reset · 0.5× / 1× / 2× speed**.
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | React 18 + Vite 5 |
+| Routing | React Router DOM v6 |
+| Language | JavaScript (JSX) |
+| Styling | Atelier custom CSS design system (matches LLDDesign) |
+| Animations | Pure CSS keyframes + inline SVG (no Framer Motion / GSAP) |
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -198,13 +242,14 @@ npm install
 npm run dev
 ```
 
-This starts all three apps concurrently with color-coded output:
+This starts all four apps concurrently with color-coded output:
 
 | App | URL |
 |-----|-----|
 | DSARevision | http://localhost:5173 |
 | LLDDesign | http://localhost:3002 |
 | SystemDesign | http://localhost:3000 |
+| MultithreadingConcurrency | http://localhost:3003 |
 
 ### Run Individual Apps
 
@@ -217,6 +262,9 @@ npm run dev:lld
 
 # System Design only
 npm run dev:sd
+
+# Multithreading & Concurrency only
+npm run dev:mt
 ```
 
 ### Install Dependencies Per App
@@ -229,13 +277,14 @@ npm install
 cd DSARevision && npm install
 cd LLDDesign && npm install
 cd SystemDesign && npm install
+cd MultithreadingConcurrency && npm install
 ```
 
 ---
 
 ## Docker Deployment
 
-The cleanest way to run AlgoSprint in production. All three services are orchestrated with a single `docker-compose.yml`.
+The cleanest way to run AlgoSprint in production. All four services are orchestrated with a single `docker-compose.yml`.
 
 ### Start All Services
 
@@ -248,6 +297,7 @@ docker compose up --build -d
 | DSARevision (Hub) | http://localhost:4173 |
 | SystemDesign | http://localhost:3000 |
 | LLDDesign | http://localhost:4002 |
+| MultithreadingConcurrency | http://localhost:4003 |
 
 ### Stop All Services
 
@@ -258,31 +308,35 @@ docker compose down
 ### Rebuild a Single Service
 
 ```bash
-docker compose up --build -d hub         # DSARevision
-docker compose up --build -d system-design  # SystemDesign
-docker compose up --build -d lld         # LLDDesign
+docker compose up --build -d hub              # DSARevision
+docker compose up --build -d system-design    # SystemDesign
+docker compose up --build -d lld              # LLDDesign
+docker compose up --build -d multithreading   # MultithreadingConcurrency
 ```
 
 ### View Logs
 
 ```bash
-docker compose logs -f             # All services
-docker compose logs -f hub         # DSARevision only
+docker compose logs -f                     # All services
+docker compose logs -f hub                 # DSARevision only
 docker compose logs -f system-design
 docker compose logs -f lld
+docker compose logs -f multithreading
 ```
 
 ### Docker Architecture
 
 ```
 docker-compose.yml
-├── hub          → DSARevision (Vite preview, port 4173)
-│                  depends on: system-design, lld
-├── system-design → SystemDesign (Next.js, port 3000)
-└── lld          → LLDDesign (Vite preview, port 4002)
+├── hub             → DSARevision (Vite preview, port 4173)
+│                     depends on: system-design, lld, multithreading
+│                     proxies /AlgoSprint/multithreading → multithreading:4003
+├── system-design   → SystemDesign (Next.js, port 3000)
+├── lld             → LLDDesign (Vite preview, port 4002)
+└── multithreading  → MultithreadingConcurrency (Vite preview, port 4003)
 ```
 
-Each service has its own `Dockerfile` in its subdirectory.
+Each service has its own `Dockerfile` in its subdirectory. The hub uses Vite's proxy to route sub-app paths, enabling seamless navigation between sections on a single domain.
 
 ---
 
@@ -325,7 +379,17 @@ RevisionGuide/
 │   ├── Dockerfile
 │   └── next.config.ts
 │
-├── docker-compose.yml            # Root orchestration
+├── MultithreadingConcurrency/    # Java Concurrency (React + Vite)
+│   ├── src/
+│   │   ├── pages/                # Home, Concepts, JavaApi, Patterns, Problems, Revision
+│   │   ├── components/           # Navbar, CodeBlock, VizControls
+│   │   ├── visualizers/          # 8 animated visualizers (ThreadLifecycle, Deadlock, Race, JMM, etc.)
+│   │   ├── data/                 # concepts.js, javaApi.js, patterns.js, problems.js
+│   │   └── styles/               # Atelier CSS design system (01-tokens → 07-visualizers)
+│   ├── Dockerfile
+│   └── vite.config.js
+│
+├── docker-compose.yml            # Root orchestration (all 4 services)
 ├── package.json                  # Root scripts (concurrently)
 └── README.md
 ```
@@ -345,12 +409,16 @@ npm run build:lld
 
 # SystemDesign
 npm run build:sd
+
+# MultithreadingConcurrency
+npm run build:mt
 ```
 
 Build outputs:
 - `DSARevision/dist/` — static files for DSA Hub
 - `LLDDesign/dist/` — static files for LLD app
 - `SystemDesign/.next/` — Next.js server output
+- `MultithreadingConcurrency/dist/` — static files for Multithreading app
 
 ---
 

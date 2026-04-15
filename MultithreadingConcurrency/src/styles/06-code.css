@@ -1,0 +1,109 @@
+/* ── 6. Code Blocks ─────────────────────────── */
+.code-block {
+  position: relative;
+  background: #1C1A17;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px 0;
+  background: #1C1A17;
+}
+
+.code-block-lang {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6A5A4A;
+}
+
+.code-block pre {
+  overflow-x: auto;
+  padding: 16px 20px 20px;
+}
+
+.code-block code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: #E8DFD0;
+  white-space: pre;
+}
+
+/* Syntax accent colors (manual, no library needed) */
+.code-block code .kw  { color: #C07850; } /* keywords: public, class, void, etc. */
+.code-block code .ty  { color: #6AA8D0; } /* types: int, String, Thread */
+.code-block code .fn  { color: #C8A060; } /* method names */
+.code-block code .st  { color: #A8C070; } /* strings */
+.code-block code .cm  { color: #5A6A4A; } /* comments */
+.code-block code .nu  { color: #D4A020; } /* numbers */
+.code-block code .an  { color: #C07050; } /* annotations @Override */
+
+.code-copy-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #998F84;
+  padding: 4px 10px;
+  border: 1px solid #3C3630;
+  border-radius: 4px;
+  background: #241F1A;
+  transition: all var(--t-base);
+  z-index: 1;
+  cursor: pointer;
+}
+.code-copy-btn:hover { color: #E8DFD0; border-color: #5C5248; }
+.code-copy-btn.copied { color: #A8C070; border-color: #A8C070; }
+
+/* Code comparison tabs (Bad / Good) */
+.code-comparison { border-radius: var(--r-md); overflow: hidden; border: 1px solid var(--border); }
+.code-tabs { display: flex; border-bottom: 1px solid var(--border); }
+
+.code-tab {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 10px 16px;
+  color: var(--ink-3);
+  background: var(--surface-2);
+  border-bottom: 2px solid transparent;
+  transition: all var(--t-base);
+  cursor: pointer;
+}
+.code-tab:hover { color: var(--ink-2); }
+.code-tab.is-active.code-tab--bad  { color: var(--red);   border-bottom-color: var(--red);   background: var(--surface); }
+.code-tab.is-active.code-tab--good { color: var(--green); border-bottom-color: var(--green); background: var(--surface); }
+
+.code-comparison-block {
+  background: #1C1A17;
+  padding: 20px;
+  overflow-x: auto;
+  margin: 0;
+}
+
+.code-comparison-block code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: #E8DFD0;
+  white-space: pre;
+  display: block;
+}
+
+.code-block--good-border { border-top: 3px solid var(--green); }
+.code-block--bad-border  { border-top: 3px solid var(--red); }

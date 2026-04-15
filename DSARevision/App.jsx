@@ -54,6 +54,7 @@ export default function App() {
   const SIMULATOR_URL =
     import.meta.env.VITE_SIMULATOR_URL || `${BASE_URL}system-design-simulator/`;
   const LLD_URL = import.meta.env.VITE_LLD_URL || `${BASE_URL}lld/`;
+  const MT_URL = import.meta.env.VITE_MT_URL || `${BASE_URL}multithreading/`;
 
   const getAreaFromLocation = useCallback(() => {
     // Works with Vite base (e.g. BASE_URL="/AlgoSprint/")
@@ -221,6 +222,24 @@ export default function App() {
               <button className="ghost-btn hub-card-cta" disabled>
                 Coming soon
               </button>
+            </div>
+
+            <div className="hub-card">
+              <div className="hub-card-top">
+                <h2 className="hub-card-title">Multithreading</h2>
+                <p className="hub-card-desc">
+                  Thread lifecycle, java.util.concurrent, concurrency patterns, and classic interview problems.
+                </p>
+              </div>
+              <a
+                className="ghost-btn hub-card-cta"
+                href={MT_URL}
+                onClick={() => {
+                  try { sessionStorage.removeItem("algosprint-area"); } catch {}
+                }}
+              >
+                Open Multithreading
+              </a>
             </div>
           </div>
         </div>
