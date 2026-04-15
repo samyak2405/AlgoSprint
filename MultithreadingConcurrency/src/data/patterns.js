@@ -139,8 +139,11 @@ public class ProducerConsumerDemo {
       "Methods that sometimes must wait for state before proceeding",
       "Classic: blocking queue, thread-safe buffer, connection pool",
     ],
-    implementation: `// Monitor using intrinsic locks
-public class BlockingStack<T> {
+    implementations: [
+      {
+        title: "Monitor with Intrinsic Locks (synchronized)",
+        description: "Every Java object is a monitor. synchronized methods serialize access; wait() suspends the thread and releases the lock; notifyAll() wakes all waiting threads. Simple but imprecise — notifyAll wakes both producers and consumers.",
+        code: `public class BlockingStack<T> {
     private final LinkedList<T> stack = new LinkedList<>();
     private final int capacity;
 
@@ -148,51 +151,56 @@ public class BlockingStack<T> {
 
     public synchronized void push(T item) throws InterruptedException {
         while (stack.size() == capacity) {
-            wait();               // release lock, suspend thread
+            wait();        // release lock; suspend this thread
         }
         stack.push(item);
-        notifyAll();              // wake threads waiting on pop
+        notifyAll();       // wake ALL waiting threads (both push-waiters and pop-waiters)
     }
 
     public synchronized T pop() throws InterruptedException {
         while (stack.isEmpty()) {
-            wait();               // release lock, suspend thread
+            wait();        // release lock; suspend this thread
         }
         T item = stack.pop();
-        notifyAll();              // wake threads waiting on push
+        notifyAll();       // wake ALL — some will find condition still false and re-wait
         return item;
     }
-}
-
-// Monitor using ReentrantLock + Condition (more precise signalling)
-public class PreciseMonitor<T> {
+    // 'while' is mandatory — spurious wakeups and wrong-side wakeups must be re-checked
+}`,
+      },
+      {
+        title: "Monitor with ReentrantLock + Conditions (Precise Signalling)",
+        description: "Using separate Condition objects (notFull, notEmpty) lets you wake only producers or only consumers. signal() wakes exactly one thread on that condition — avoiding the thundering-herd of notifyAll().",
+        code: `public class PreciseMonitor<T> {
     private final LinkedList<T> buffer = new LinkedList<>();
     private final int capacity;
-    private final ReentrantLock lock = new ReentrantLock();
-    private final Condition notFull  = lock.newCondition();
-    private final Condition notEmpty = lock.newCondition();
+    private final ReentrantLock lock    = new ReentrantLock();
+    private final Condition     notFull  = lock.newCondition(); // producers wait here
+    private final Condition     notEmpty = lock.newCondition(); // consumers wait here
 
     public PreciseMonitor(int capacity) { this.capacity = capacity; }
 
     public void put(T item) throws InterruptedException {
         lock.lock();
         try {
-            while (buffer.size() == capacity) notFull.await();
+            while (buffer.size() == capacity) notFull.await();  // release lock; park
             buffer.addLast(item);
-            notEmpty.signal(); // wake only one consumer (not all threads)
+            notEmpty.signal(); // wake exactly ONE consumer — not everyone
         } finally { lock.unlock(); }
     }
 
     public T take() throws InterruptedException {
         lock.lock();
         try {
-            while (buffer.isEmpty()) notEmpty.await();
+            while (buffer.isEmpty()) notEmpty.await();           // release lock; park
             T item = buffer.removeFirst();
-            notFull.signal(); // wake only one producer
+            notFull.signal(); // wake exactly ONE producer
             return item;
         } finally { lock.unlock(); }
     }
 }`,
+      },
+    ],
     tradeoffs: "notifyAll() wakes all waiting threads (thundering herd) but is safe. Using separate Conditions (notFull/notEmpty) and signal() avoids waking the wrong side.",
   },
 
@@ -209,14 +217,19 @@ public class PreciseMonitor<T> {
       "When synchronized would serialize reads unnecessarily",
       "Scenario: 95% reads, 5% writes — plain lock wastes throughput",
     ],
-    implementation: `import java.util.concurrent.locks.*;
+    implementations: [
+      {
+        title: "ReentrantReadWriteLock — Shared Reads, Exclusive Writes",
+        description: "readLock() is shared — many threads can hold it simultaneously. writeLock() is exclusive — it blocks all readers and other writers. Ideal for read-heavy caches.",
+        code: `import java.util.concurrent.locks.*;
 
 public class ThreadSafeCache<K, V> {
     private final Map<K, V> cache = new HashMap<>();
     private final ReentrantReadWriteLock rwLock = new ReentrantReadWriteLock();
 
+    // Many threads can read simultaneously — no contention between readers
     public V get(K key) {
-        rwLock.readLock().lock();         // multiple threads can hold this
+        rwLock.readLock().lock();
         try {
             return cache.get(key);
         } finally {
@@ -224,30 +237,45 @@ public class ThreadSafeCache<K, V> {
         }
     }
 
+    // Exclusive: blocks ALL readers and other writers while updating
     public void put(K key, V value) {
-        rwLock.writeLock().lock();        // exclusive — blocks all readers
+        rwLock.writeLock().lock();
         try {
             cache.put(key, value);
         } finally {
             rwLock.writeLock().unlock();
         }
     }
+}`,
+      },
+      {
+        title: "StampedLock — Optimistic Reads (Higher Throughput)",
+        description: "StampedLock.tryOptimisticRead() returns a version stamp WITHOUT acquiring any lock. After reading, validate(stamp) checks if a write happened. If so, fall back to a real read lock. This can be 2-3x faster than ReentrantReadWriteLock for read-heavy workloads.",
+        code: `import java.util.concurrent.locks.*;
 
-    // Optimistic read with StampedLock (Java 8) — even higher throughput
-    private final StampedLock stampedLock = new StampedLock();
-    private double x, y; // shared state
+class Point {
+    private double x, y;
+    private final StampedLock sl = new StampedLock();
 
-    public double distanceTo(double ox, double oy) {
-        long stamp = stampedLock.tryOptimisticRead(); // no lock!
-        double curX = x, curY = y;
-        if (!stampedLock.validate(stamp)) {           // check if write happened
-            stamp = stampedLock.readLock();           // fall back to real lock
-            try { curX = x; curY = y; }
-            finally { stampedLock.unlockRead(stamp); }
+    void move(double dx, double dy) {
+        long stamp = sl.writeLock();          // exclusive write — conventional
+        try { x += dx; y += dy; }
+        finally { sl.unlockWrite(stamp); }
+    }
+
+    double distanceTo(double ox, double oy) {
+        long stamp = sl.tryOptimisticRead();  // NO lock — just a version number
+        double cx = x, cy = y;               // read speculatively
+        if (!sl.validate(stamp)) {           // was a write happening while we read?
+            stamp = sl.readLock();           // YES — fallback to real read lock
+            try { cx = x; cy = y; }
+            finally { sl.unlockRead(stamp); }
         }
-        return Math.hypot(curX - ox, curY - oy);
+        return Math.hypot(cx - ox, cy - oy); // computed on consistent snapshot
     }
 }`,
+      },
+    ],
     tradeoffs: "If writes are frequent, write lock blocks all reads, reducing throughput. StampedLock provides higher throughput with optimistic reads but is non-reentrant and more complex to use correctly.",
   },
 

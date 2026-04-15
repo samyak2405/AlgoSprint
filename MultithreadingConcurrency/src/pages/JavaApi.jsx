@@ -1,82 +1,39 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { JAVA_API, CATEGORY_META } from "../data/javaApi.js";
-import CodeBlock from "../components/CodeBlock.jsx";
-import SemaphoreViz from "../visualizers/SemaphoreViz.jsx";
-import CountDownLatchViz from "../visualizers/CountDownLatchViz.jsx";
 
 function ApiCard({ api, index }) {
-  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const meta = CATEGORY_META[api.category];
+  const preview = api.purpose.length > 110
+    ? api.purpose.slice(0, 110).trimEnd() + "…"
+    : api.purpose;
 
   return (
-    <div className={"item-card" + (open ? " is-open" : "")}
-         style={{ "--cat-color": meta?.color, "--cat-bg": meta?.bg }}
+    <div
+      className="topic-card"
+      style={{ "--cat-color": meta?.color, "--cat-bg": meta?.bg }}
+      onClick={() => navigate(`/java-api/${api.id}`)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && navigate(`/java-api/${api.id}`)}
     >
-      <button className="item-card-header" onClick={() => setOpen((v) => !v)}>
-        <div className="item-card-left">
-          <span className="item-card-icon">{String(index + 1).padStart(2, "0")}</span>
-          <div className="item-card-meta">
-            <div className="item-card-title">{api.title}</div>
-            <div className="item-card-tags">
-              <span className="item-tag" style={{ color: meta?.color, background: meta?.bg }}>
-                {api.category}
-              </span>
-              {api.tags.slice(0, 2).map((t) => (
-                <span key={t} className="item-tag">{t}</span>
-              ))}
-            </div>
-          </div>
+      <div className="topic-card-header">
+        <span className="topic-card-num">{String(index + 1).padStart(2, "0")}</span>
+        <span className="topic-card-cat" style={{ color: meta?.color, background: meta?.bg }}>
+          {api.category}
+        </span>
+      </div>
+      <h3 className="topic-card-title">{api.title}</h3>
+      <p className="topic-card-preview">{preview}</p>
+      <div className="topic-card-footer">
+        <div className="topic-card-tags">
+          {api.tags.slice(0, 3).map((t) => (
+            <span key={t} className="topic-tag">{t}</span>
+          ))}
         </div>
-        <div className="item-card-right">
-          <i className={"item-chevron" + (open ? " is-open" : "")}>▾</i>
-        </div>
-      </button>
-
-      {open && (
-        <div className="item-card-body">
-          {/* Purpose */}
-          <div>
-            <div className="item-section-label">Purpose</div>
-            <p className="item-definition">{api.purpose}</p>
-          </div>
-
-          {/* Visualization */}
-          {api.id === "semaphore" && (
-            <div>
-              <div className="item-section-label">Interactive Visualization</div>
-              <SemaphoreViz />
-            </div>
-          )}
-          {api.id === "count-down-latch" && (
-            <div>
-              <div className="item-section-label">Interactive Visualization</div>
-              <CountDownLatchViz />
-            </div>
-          )}
-
-          {/* Signature */}
-          <div>
-            <div className="item-section-label">Key API</div>
-            <CodeBlock code={api.signature} lang="java" />
-          </div>
-
-          {/* Code example */}
-          <div>
-            <div className="item-section-label">Java Example</div>
-            <CodeBlock code={api.codeExample} />
-          </div>
-
-          {/* Pitfalls */}
-          {api.pitfalls && api.pitfalls.length > 0 && (
-            <div>
-              <div className="item-section-label">Common Pitfalls</div>
-              <ul className="item-list-items item-list-items--cross">
-                {api.pitfalls.map((p, i) => <li key={i}>{p}</li>)}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
+        <span className="topic-card-cta">View →</span>
+      </div>
     </div>
   );
 }
@@ -84,15 +41,12 @@ function ApiCard({ api, index }) {
 export default function JavaApi() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
-
   const categories = ["All", ...Object.keys(CATEGORY_META)];
 
   const filtered = JAVA_API.filter((a) => {
     const matchCat = activeCategory === "All" || a.category === activeCategory;
     const q = search.toLowerCase();
-    const matchSearch = !q || a.title.toLowerCase().includes(q) ||
-      a.tags.some((t) => t.toLowerCase().includes(q));
-    return matchCat && matchSearch;
+    return matchCat && (!q || a.title.toLowerCase().includes(q) || a.tags.some((t) => t.toLowerCase().includes(q)));
   });
 
   return (
@@ -102,7 +56,7 @@ export default function JavaApi() {
         <h1 className="page-title">java.util.concurrent</h1>
         <p className="page-subtitle">
           The full Java concurrency API — executors, futures, synchronizers, queues,
-          concurrent collections, atomics, and locks — with Java examples and gotchas.
+          concurrent collections, atomics, locks, and virtual threads.
         </p>
       </div>
 
@@ -115,8 +69,8 @@ export default function JavaApi() {
               onClick={() => setActiveCategory(cat)}
             >
               {cat}
-              {cat !== "All" && CATEGORY_META[cat].count > 0 && (
-                <span style={{ marginLeft: 6, opacity: 0.6 }}>
+              {cat !== "All" && CATEGORY_META[cat]?.count > 0 && (
+                <span style={{ marginLeft: 6, opacity: 0.55, fontSize: "0.85em" }}>
                   {CATEGORY_META[cat].count}
                 </span>
               )}
@@ -126,21 +80,21 @@ export default function JavaApi() {
         <input
           type="search"
           className="page-search"
-          placeholder="Search API..."
+          placeholder="Search API…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      <div className="item-list">
-        {filtered.length === 0 ? (
-          <div className="empty-state">No API entries match your search.</div>
-        ) : (
-          filtered.map((api, i) => (
+      {filtered.length === 0 ? (
+        <div className="empty-state">No API entries match your search.</div>
+      ) : (
+        <div className="topic-grid">
+          {filtered.map((api, i) => (
             <ApiCard key={api.id} api={api} index={i} />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

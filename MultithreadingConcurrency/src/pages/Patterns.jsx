@@ -1,88 +1,40 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { PATTERNS, CATEGORY_META } from "../data/patterns.js";
-import CodeBlock from "../components/CodeBlock.jsx";
-import ProducerConsumerViz from "../visualizers/ProducerConsumerViz.jsx";
-import ThreadPoolViz from "../visualizers/ThreadPoolViz.jsx";
 
 function PatternCard({ pattern, index }) {
-  const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
   const meta = CATEGORY_META[pattern.category];
+  const preview = pattern.intent.length > 110
+    ? pattern.intent.slice(0, 110).trimEnd() + "…"
+    : pattern.intent;
 
   return (
-    <div className={"item-card" + (open ? " is-open" : "")}
-         style={{ "--cat-color": meta?.color, "--cat-bg": meta?.bg }}
+    <div
+      className="topic-card"
+      style={{ "--cat-color": meta?.color, "--cat-bg": meta?.bg }}
+      onClick={() => navigate(`/patterns/${pattern.id}`)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && navigate(`/patterns/${pattern.id}`)}
     >
-      <button className="item-card-header" onClick={() => setOpen((v) => !v)}>
-        <div className="item-card-left">
-          <span className="item-card-icon">{String(index + 1).padStart(2, "0")}</span>
-          <div className="item-card-meta">
-            <div className="item-card-title">{pattern.name}</div>
-            <div className="item-card-tags">
-              <span className="item-tag" style={{ color: meta?.color, background: meta?.bg }}>
-                {pattern.category}
-              </span>
-              <span className="item-tag" style={{ fontStyle: "italic", opacity: 0.8 }}>
-                {pattern.tagline}
-              </span>
-            </div>
-          </div>
+      <div className="topic-card-header">
+        <span className="topic-card-num">{String(index + 1).padStart(2, "0")}</span>
+        <span className="topic-card-cat" style={{ color: meta?.color, background: meta?.bg }}>
+          {pattern.category}
+        </span>
+      </div>
+      <h3 className="topic-card-title">{pattern.name}</h3>
+      <p className="topic-card-tagline">{pattern.tagline}</p>
+      <p className="topic-card-preview">{preview}</p>
+      <div className="topic-card-footer">
+        <div className="topic-card-tags">
+          {(pattern.tags || []).slice(0, 3).map((t) => (
+            <span key={t} className="topic-tag">{t}</span>
+          ))}
         </div>
-        <div className="item-card-right">
-          <i className={"item-chevron" + (open ? " is-open" : "")}>▾</i>
-        </div>
-      </button>
-
-      {open && (
-        <div className="item-card-body">
-          {/* Intent */}
-          <div>
-            <div className="item-section-label">Intent</div>
-            <p className="item-definition">{pattern.intent}</p>
-          </div>
-
-          {/* Participants */}
-          <div>
-            <div className="item-section-label">Participants</div>
-            <ul className="item-list-items item-list-items--arrow">
-              {pattern.participants.map((p, i) => <li key={i}>{p}</li>)}
-            </ul>
-          </div>
-
-          {/* When to use */}
-          <div>
-            <div className="item-section-label">When to use</div>
-            <ul className="item-list-items item-list-items--check">
-              {pattern.whenToUse.map((w, i) => <li key={i}>{w}</li>)}
-            </ul>
-          </div>
-
-          {/* Visualization */}
-          {pattern.id === "thread-pool" && (
-            <div>
-              <div className="item-section-label">Interactive Visualization</div>
-              <ThreadPoolViz />
-            </div>
-          )}
-          {pattern.id === "producer-consumer" && (
-            <div>
-              <div className="item-section-label">Interactive Visualization</div>
-              <ProducerConsumerViz />
-            </div>
-          )}
-
-          {/* Implementation */}
-          <div>
-            <div className="item-section-label">Java Implementation</div>
-            <CodeBlock code={pattern.implementation} />
-          </div>
-
-          {/* Trade-offs */}
-          <div className="item-takeaway">
-            <span className="item-takeaway-label">Trade-offs</span>
-            <p>{pattern.tradeoffs}</p>
-          </div>
-        </div>
-      )}
+        <span className="topic-card-cta">View →</span>
+      </div>
     </div>
   );
 }
@@ -90,15 +42,12 @@ function PatternCard({ pattern, index }) {
 export default function Patterns() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
-
   const categories = ["All", ...Object.keys(CATEGORY_META)];
 
   const filtered = PATTERNS.filter((p) => {
     const matchCat = activeCategory === "All" || p.category === activeCategory;
     const q = search.toLowerCase();
-    const matchSearch = !q || p.name.toLowerCase().includes(q) ||
-      p.tagline.toLowerCase().includes(q);
-    return matchCat && matchSearch;
+    return matchCat && (!q || p.name.toLowerCase().includes(q) || p.tagline.toLowerCase().includes(q));
   });
 
   return (
@@ -108,7 +57,7 @@ export default function Patterns() {
         <h1 className="page-title">Concurrency Patterns</h1>
         <p className="page-subtitle">
           Reusable solutions to recurring concurrency problems — from the Thread Pool
-          to Fork-Join. Each pattern includes intent, participants, and a full Java implementation.
+          to Fork-Join. Intent, participants, and full Java implementations.
         </p>
       </div>
 
@@ -127,21 +76,21 @@ export default function Patterns() {
         <input
           type="search"
           className="page-search"
-          placeholder="Search patterns..."
+          placeholder="Search patterns…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
 
-      <div className="item-list">
-        {filtered.length === 0 ? (
-          <div className="empty-state">No patterns match your search.</div>
-        ) : (
-          filtered.map((pattern, i) => (
+      {filtered.length === 0 ? (
+        <div className="empty-state">No patterns match your search.</div>
+      ) : (
+        <div className="topic-grid">
+          {filtered.map((pattern, i) => (
             <PatternCard key={pattern.id} pattern={pattern} index={i} />
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -116,6 +116,61 @@ const REVISION_CARDS = [
     oneliner: "Multiple readers OR one exclusive writer. Use when reads vastly outnumber writes.",
     key: "rwLock.readLock() / writeLock()", gotcha: "Lock UPGRADE (read→write) is NOT allowed — causes deadlock. Downgrade is fine." },
 
+  // ── Locking ────────────────────────────────────────────────────────────
+  { id: "r29", category: "Locking", color: "#E07060", title: "Intrinsic Lock",
+    oneliner: "Every Java object has one. synchronized acquires it. Automatically released on block exit. Reentrant by default.",
+    key: "synchronized(obj) { }", gotcha: "You cannot interrupt a thread waiting for an intrinsic lock. Use ReentrantLock.lockInterruptibly() when you need that." },
+
+  { id: "r30", category: "Locking", color: "#E07060", title: "Lock Granularity",
+    oneliner: "Coarse-grained (one lock for all) = simple but bottleneck. Fine-grained (per-bucket/per-row) = throughput but deadlock risk.",
+    key: "ConcurrentHashMap (bucket-level)", gotcha: "Too-fine granularity means more locks to acquire in order — deadlock becomes easier to introduce." },
+
+  { id: "r31", category: "Locking", color: "#E07060", title: "Monitor Pattern",
+    oneliner: "A lock + condition variable + the protected data bundled together. Every synchronized Java object is a monitor.",
+    key: "wait() / notify() inside synchronized", gotcha: "Condition.await() releases the lock, just like Object.wait(). Call inside a while(), never an if()." },
+
+  // ── Types of Locking ──────────────────────────────────────────────────
+  { id: "r32", category: "Types of Locking", color: "#A78BFA", title: "Pessimistic vs Optimistic",
+    oneliner: "Pessimistic: lock before read/write (assumes conflict). Optimistic: read freely, validate before commit (assumes no conflict).",
+    key: "CAS / AtomicInteger.compareAndSet()", gotcha: "Optimistic fails under high contention — CAS retries burn CPU. Switch to pessimistic when retry rate is high." },
+
+  { id: "r33", category: "Types of Locking", color: "#A78BFA", title: "Spin Lock",
+    oneliner: "Thread loops (spins) on CAS instead of sleeping. No OS context switch. Ideal for microsecond-scale critical sections.",
+    key: "AtomicReference.compareAndSet()", gotcha: "Spinning under long waits wastes CPU — prefer a blocking lock for anything > a few microseconds." },
+
+  { id: "r34", category: "Types of Locking", color: "#A78BFA", title: "Reentrant Lock",
+    oneliner: "A thread already holding the lock can acquire it again. Hold count increments; releases when count reaches zero.",
+    key: "synchronized & ReentrantLock are both reentrant", gotcha: "Non-reentrant locks (rare) deadlock if the same thread re-acquires. Always know if your lock is reentrant." },
+
+  { id: "r35", category: "Types of Locking", color: "#A78BFA", title: "Read-Write Lock",
+    oneliner: "Shared read (many concurrent readers OK) OR exclusive write (one writer, zero readers). Maximises read throughput.",
+    key: "ReentrantReadWriteLock / StampedLock", gotcha: "Lock UPGRADE (read→write) deadlocks. Lock DOWNGRADE (write→read) is allowed. StampedLock adds optimistic reads." },
+
+  { id: "r36", category: "Types of Locking", color: "#A78BFA", title: "Fair vs Unfair Lock",
+    oneliner: "Fair (FIFO): longest-waiter goes next — no starvation. Unfair (barging): any thread can barge in — higher throughput.",
+    key: "new ReentrantLock(true) // fair", gotcha: "Fair locks can be 5–10× slower than unfair. Only use fairness when starvation is a proven production issue." },
+
+  { id: "r37", category: "Types of Locking", color: "#A78BFA", title: "StampedLock",
+    oneliner: "Java 8. Three modes: write (exclusive), read (shared), optimistic-read (no lock + validate). Highest throughput for read-heavy.",
+    key: "sl.tryOptimisticRead() + sl.validate(stamp)", gotcha: "StampedLock is NOT reentrant. Calling writeLock() while holding readLock() deadlocks." },
+
+  // ── Virtual Threads ────────────────────────────────────────────────────
+  { id: "r38", category: "Virtual Threads", color: "#4ADE80", title: "Virtual Threads",
+    oneliner: "Java 21. JVM-managed lightweight threads (~KB each). Millions can coexist. Ideal for I/O-bound work.",
+    key: "Thread.ofVirtual().start(r) / Executors.newVirtualThreadPerTaskExecutor()", gotcha: "synchronized blocks PIN the virtual thread to its carrier — use ReentrantLock in hot I/O paths." },
+
+  { id: "r39", category: "Virtual Threads", color: "#4ADE80", title: "Carrier Thread",
+    oneliner: "The OS thread a virtual thread runs on. When the virtual thread blocks on I/O, it unmounts — carrier is free for others.",
+    key: "Runtime.getRuntime().availableProcessors()", gotcha: "JVM has one carrier per CPU core (ForkJoin common pool). If all carriers are pinned, virtual threads queue up." },
+
+  { id: "r40", category: "Virtual Threads", color: "#4ADE80", title: "StructuredTaskScope",
+    oneliner: "Structured concurrency: fork child tasks, join all, guarantee all are cancelled on scope exit. No thread leaks.",
+    key: "StructuredTaskScope.ShutdownOnFailure / ShutdownOnSuccess", gotcha: "Java 21 = preview feature (--enable-preview). Stable in Java 23+. Do NOT call scope.fork() after scope.join()." },
+
+  { id: "r41", category: "Virtual Threads", color: "#4ADE80", title: "Virtual Thread Pitfalls",
+    oneliner: "Do NOT pool them (cheap to create). Do NOT use for CPU-bound work. Avoid ThreadLocal (prefer ScopedValue).",
+    key: "spring.threads.virtual.enabled=true (Spring Boot 3.2+)", gotcha: "ThreadLocal works but has worse GC pressure with millions of virtual threads — each thread has its own map entry." },
+
   // ── Misc ───────────────────────────────────────────────────────────────
   { id: "r27", category: "Misc", color: "var(--ink-3)", title: "ThreadLocal",
     oneliner: "Per-thread copy of a variable. No synchronization needed. Common use: SimpleDateFormat, DB connections.",
@@ -126,8 +181,9 @@ const REVISION_CARDS = [
     key: "ForkJoinPool.commonPool().invoke(task)", gotcha: "NOT for I/O-bound tasks — use a dedicated thread pool. Overhead kills small datasets." },
 ];
 
-const CATEGORIES = ["All", "Fundamentals", "Synchronization", "Pitfalls",
-  "Executors", "Futures", "Synchronizers", "Queues", "Collections", "Atomics", "Locks", "Misc"];
+const CATEGORIES = ["All", "Fundamentals", "Synchronization", "Locking", "Types of Locking",
+  "Virtual Threads", "Pitfalls", "Executors", "Futures", "Synchronizers",
+  "Queues", "Collections", "Atomics", "Locks", "Misc"];
 
 export default function Revision() {
   const [activeCategory, setActiveCategory] = useState("All");
