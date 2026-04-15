@@ -23,10 +23,37 @@ import { mapProblemCuesToPatterns } from "./src/utils/problemCueMapper";
 import { MISTAKES_CATALOG } from "./src/data/mistakesCatalog";
 import { useKeyboardNavigation } from "./src/hooks/useKeyboardNavigation";
 
+function ThemeToggleFab({ theme, onToggle }) {
+  const isDark = theme === "dark";
+  const nextMode = isDark ? "light" : "dark";
+  return (
+    <button
+      className="theme-toggle-fab"
+      onClick={onToggle}
+      aria-label={`Switch to ${nextMode} mode`}
+    >
+      {isDark ? (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      ) : (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      )}
+      <span>{nextMode.charAt(0).toUpperCase() + nextMode.slice(1)}</span>
+    </button>
+  );
+}
+
 export default function App() {
   const BASE_URL = import.meta.env.BASE_URL || "/";
   const SIMULATOR_URL =
     import.meta.env.VITE_SIMULATOR_URL || `${BASE_URL}system-design-simulator/`;
+  const LLD_URL = import.meta.env.VITE_LLD_URL || `${BASE_URL}lld/`;
 
   const getAreaFromLocation = useCallback(() => {
     // Works with Vite base (e.g. BASE_URL="/AlgoSprint/")
@@ -39,14 +66,26 @@ export default function App() {
     return "hub";
   }, [BASE_URL]);
 
-  const [siteArea, setSiteArea] = useState(() => getAreaFromLocation()); // hub | dsa | systemDesign
+  // Initialise from URL first, then fall back to sessionStorage if URL says "hub"
+  // (covers the case where the user pressed back from LLD/simulator and the hub reloaded)
+  const [siteArea, setSiteArea] = useState(() => {
+    const fromUrl = getAreaFromLocation();
+    if (fromUrl !== "hub") return fromUrl;
+    try {
+      const saved = sessionStorage.getItem("algosprint-area");
+      if (saved && saved !== "hub") return saved;
+    } catch {}
+    return "hub";
+  });
 
   const navigate = useCallback(
     (area) => {
       const path =
         area === "systemDesign" ? "system-design" : area === "dsa" ? "dsa" : "";
       const nextUrl = `${BASE_URL}${path}`;
-      window.history.pushState({}, "", nextUrl);
+      // Save area in history state so popstate can restore it without re-reading the URL
+      window.history.pushState({ area }, "", nextUrl);
+      try { sessionStorage.setItem("algosprint-area", area); } catch {}
       setSiteArea(area);
     },
     [BASE_URL]
@@ -102,8 +141,18 @@ export default function App() {
     onTogglePalette: () => setPaletteOpen((v) => !v),
   });
 
+  // Sync area to sessionStorage whenever it changes
   useEffect(() => {
-    const onPopState = () => setSiteArea(getAreaFromLocation());
+    try { sessionStorage.setItem("algosprint-area", siteArea); } catch {}
+  }, [siteArea]);
+
+  useEffect(() => {
+    const onPopState = (e) => {
+      // Prefer the area stored in the history state (set by navigate()), fall back to URL
+      const area = e.state?.area || getAreaFromLocation();
+      setSiteArea(area);
+      try { sessionStorage.setItem("algosprint-area", area); } catch {}
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [getAreaFromLocation]);
@@ -111,6 +160,7 @@ export default function App() {
   if (siteArea === "hub") {
     return (
       <div className="page">
+        <ThemeToggleFab theme={theme} onToggle={toggleTheme} />
         <div className="container">
           <header className="header">
             <span className="eyebrow">AlgoSprint · Learning Hub</span>
@@ -145,14 +195,22 @@ export default function App() {
               </button>
             </div>
 
-            <div className="hub-card hub-card-disabled">
+            <div className="hub-card">
               <div className="hub-card-top">
                 <h2 className="hub-card-title">LLD</h2>
-                <p className="hub-card-desc">Low Level Design content (coming soon).</p>
+                <p className="hub-card-desc">
+                  Design patterns, SOLID principles, and common interview problems.
+                </p>
               </div>
-              <button className="ghost-btn hub-card-cta" disabled>
-                Coming soon
-              </button>
+              <a
+                className="ghost-btn hub-card-cta"
+                href={LLD_URL}
+                onClick={() => {
+                  try { sessionStorage.removeItem("algosprint-area"); } catch {}
+                }}
+              >
+                Open LLD
+              </a>
             </div>
 
             <div className="hub-card hub-card-disabled">
@@ -173,6 +231,7 @@ export default function App() {
   if (siteArea === "systemDesign") {
     return (
       <div className="page">
+        <ThemeToggleFab theme={theme} onToggle={toggleTheme} />
         <div className="container">
           <div className="hub-back-row">
             <button className="ghost-btn" onClick={() => navigate("hub")}>
@@ -208,7 +267,14 @@ export default function App() {
                   Open the System Design Simulator app to practice HLD problems.
                 </p>
               </div>
-              <a className="ghost-btn hub-card-cta" href={SIMULATOR_URL}>
+              <a
+                className="ghost-btn hub-card-cta"
+                href={SIMULATOR_URL}
+                onClick={() => {
+                  // Persist current area so pressing back restores "systemDesign" view
+                  try { sessionStorage.setItem("algosprint-area", "systemDesign"); } catch {}
+                }}
+              >
                 Open Simulator
               </a>
             </div>
@@ -220,6 +286,7 @@ export default function App() {
 
   return (
     <div className="page">
+      <ThemeToggleFab theme={theme} onToggle={toggleTheme} />
       <div className="container">
         <div className="hub-back-row">
           <button className="ghost-btn" onClick={() => navigate("hub")}>
@@ -239,9 +306,6 @@ export default function App() {
               </button>
             ))}
           </div>
-          <button className="objective-theme-btn" onClick={toggleTheme}>
-            Theme: {theme === "dark" ? "Dark" : "Light"}
-          </button>
         </div>
         {objectiveView === "core" && <SectionTabs sections={SECTIONS} currentSection={currentSection} onSwitchSection={switchSection} />}
 

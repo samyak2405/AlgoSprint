@@ -1,6 +1,6 @@
-/* ALGOSPRINT — split from styles.css for maintainability. */
+/* ALGOSPRINT — Base & Reset */
 
-/* ── 5. Reset & Base ───────────────────────────────────────── */
+/* ── Reset ──────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -50,25 +50,37 @@ ul, ol {
   padding: 0;
 }
 
-/* Focus-visible ring — keyboard only */
 :focus-visible {
   outline: none;
   box-shadow: var(--ring);
 }
 
-/* ── 6. Layout ─────────────────────────────────────────────── */
+/* ── Layout ──────────────────────────────────────────────────── */
 .page {
   min-height: 100vh;
-  background: var(--gradient-page);
+  background: var(--bg-page);
+  background-image:
+    var(--gradient-glow),
+    radial-gradient(circle at 100% 100%, rgba(183,134,12,.04) 0%, transparent 50%),
+    var(--gradient-page);
   padding: var(--sp-8) var(--sp-4) var(--sp-12);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .page {
+    background-image:
+      var(--gradient-glow),
+      radial-gradient(circle at 100% 100%, rgba(212,160,32,.03) 0%, transparent 50%),
+      var(--gradient-page);
+  }
+}
+
 .container {
-  max-width: 1000px;
+  max-width: 1020px;
   margin: 0 auto;
 }
 
-/* ── 7. Typography Helpers ─────────────────────────────────── */
+/* ── Typography Helpers ─────────────────────────────────────── */
 .eyebrow {
   display: inline-flex;
   align-items: center;
@@ -80,7 +92,7 @@ ul, ol {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--color-primary);
 }
@@ -98,3 +110,12 @@ ul, ol {
   font-size: var(--text-sm);
 }
 
+/* ── Entrance Animations ────────────────────────────────────── */
+.animate-in {
+  animation: fadeInUp var(--t-enter) var(--ease-out) both;
+}
+
+.animate-in-delay-1 { animation-delay: 60ms; }
+.animate-in-delay-2 { animation-delay: 120ms; }
+.animate-in-delay-3 { animation-delay: 180ms; }
+.animate-in-delay-4 { animation-delay: 240ms; }

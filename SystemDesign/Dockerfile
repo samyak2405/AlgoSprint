@@ -9,10 +9,11 @@ RUN npm run build
 # ── Run ──────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
-# vite.config.js is needed at runtime so the preview server can read proxy settings
-COPY --from=builder /app/dist ./dist
+ENV NODE_ENV=production
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./
-COPY --from=builder /app/vite.config.js ./
-EXPOSE 4173
-CMD ["npm", "run", "preview"]
+COPY --from=builder /app/next.config.ts ./
+EXPOSE 3000
+CMD ["npm", "run", "start"]

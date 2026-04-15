@@ -3,12 +3,12 @@
 
 /* ── 23. Transitions & Animations ──────────────────────────── */
 .fade {
-  transition: opacity var(--t-base) ease, transform var(--t-base) ease;
+  transition: opacity var(--t-base) ease, transform var(--t-slow) var(--ease-out);
 }
 
 .fade.animating {
-  opacity: 0.25;
-  transform: translateY(6px);
+  opacity: 0;
+  transform: translateY(10px) scale(0.99);
 }
 
 /* ── 24. Responsive (≤ 860 px) ─────────────────────────────── */

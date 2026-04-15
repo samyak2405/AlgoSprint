@@ -1,40 +1,95 @@
-/* ALGOSPRINT — split from styles.css for maintainability. */
+/* ALGOSPRINT — Layout Shell */
 
-/* ── 8. Header ─────────────────────────────────────────────── */
+/* ── Header ─────────────────────────────────────────────────── */
 .header {
   text-align: center;
-  margin-bottom: var(--sp-6);
-  padding: var(--sp-6) 0 var(--sp-4);
+  margin-bottom: var(--sp-8);
+  padding: var(--sp-8) 0 var(--sp-5);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--sp-3);
+  gap: var(--sp-4);
+  animation: fadeInUp var(--t-enter) var(--ease-out) both;
 }
 
 .header h1 {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xl);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
   font-weight: var(--weight-extrabold);
   line-height: var(--leading-tight);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   background: var(--gradient-brand);
+  background-size: 200% auto;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  animation: shimmer 4s linear infinite;
 }
 
 .header .subtext {
   margin-top: 0;
-  font-size: var(--text-base);
+  font-size: var(--text-md);
+  animation: fadeInUp var(--t-enter) var(--ease-out) both;
+  animation-delay: 80ms;
 }
 
-/* ── 9. Objective / View Toggle Row ────────────────────────── */
+/* ── Global Theme Toggle FAB ────────────────────────────────── */
+.theme-toggle-fab {
+  position: fixed;
+  top: var(--sp-5);
+  right: var(--sp-5);
+  z-index: 999;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 10px var(--sp-4);
+  border-radius: var(--r-pill);
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  box-shadow: var(--shadow-lg);
+  cursor: pointer;
+  transition: all var(--t-base) var(--ease-out);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.theme-toggle-fab:hover {
+  border-color: var(--color-primary-border);
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  transform: translateY(-2px);
+}
+
+.theme-toggle-fab:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.theme-toggle-fab:focus-visible {
+  box-shadow: var(--ring), var(--shadow-lg);
+}
+
+.theme-toggle-fab svg {
+  flex-shrink: 0;
+  transition: transform var(--t-slow) var(--ease-spring);
+}
+
+.theme-toggle-fab:hover svg {
+  transform: rotate(20deg) scale(1.1);
+}
+
+/* ── Objective / View Toggle Row ────────────────────────────── */
 .objective-toggle-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: var(--sp-3);
-  margin-bottom: var(--sp-4);
+  margin-bottom: var(--sp-5);
+  animation: fadeInUp var(--t-enter) var(--ease-out) both;
+  animation-delay: 100ms;
 }
 
 .objective-toggle-left {
@@ -44,14 +99,15 @@
 }
 
 .objective-toggle-btn {
-  padding: 7px var(--sp-4);
+  padding: 8px var(--sp-4);
   border-radius: var(--r-pill);
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
   color: var(--text-secondary);
+  font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  transition: all var(--t-base) ease;
+  transition: all var(--t-base) var(--ease-out);
   box-shadow: var(--shadow-xs);
 }
 
@@ -59,13 +115,15 @@
   border-color: var(--color-primary-border);
   color: var(--color-primary);
   background: var(--color-primary-subtle);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .objective-toggle-btn.active {
   background: var(--gradient-brand);
   border-color: transparent;
   color: #fff;
-  box-shadow: 0 2px 8px rgba(99,102,241,.35);
+  box-shadow: 0 2px 12px rgba(192,57,43,.35);
 }
 
 .objective-toggle-btn:focus-visible {
@@ -76,33 +134,38 @@
   display: flex;
   align-items: center;
   gap: var(--sp-2);
-  padding: 7px var(--sp-3);
+  padding: 8px var(--sp-3);
   border-radius: var(--r-pill);
   border: 1px solid var(--border-default);
   background: var(--bg-surface);
   color: var(--text-secondary);
+  font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   white-space: nowrap;
-  transition: all var(--t-base) ease;
+  transition: all var(--t-base) var(--ease-out);
   box-shadow: var(--shadow-xs);
 }
 
 .objective-theme-btn:hover {
   border-color: var(--border-strong);
   color: var(--text-primary);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
 }
 
 .objective-theme-btn:focus-visible {
   box-shadow: var(--ring);
 }
 
-/* ── 10. Section Tabs ──────────────────────────────────────── */
+/* ── Section Tabs ───────────────────────────────────────────── */
 .section-switcher {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--sp-2);
-  margin-bottom: var(--sp-4);
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+  animation: fadeInUp var(--t-enter) var(--ease-out) both;
+  animation-delay: 140ms;
 }
 
 .section-tab {
@@ -110,15 +173,16 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
-  padding: var(--sp-4);
-  border-radius: var(--r-lg);
+  padding: var(--sp-4) var(--sp-4);
+  border-radius: var(--r-xl);
   border: 1px solid var(--border-subtle);
   background: var(--bg-surface);
   color: var(--text-secondary);
   text-align: left;
-  transition: all var(--t-base) ease;
+  transition: all var(--t-base) var(--ease-out);
   box-shadow: var(--shadow-xs);
   overflow: hidden;
+  cursor: pointer;
 }
 
 .section-tab::before {
@@ -130,12 +194,32 @@
   transition: opacity var(--t-base) ease;
 }
 
+/* Animated border on hover via pseudo gradient */
+.section-tab::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--r-xl);
+  background: linear-gradient(135deg, #C0392B, #B7860C, #C0392B);
+  background-size: 200% 200%;
+  opacity: 0;
+  z-index: -1;
+  transition: opacity var(--t-base) ease;
+}
+
+.section-tab:hover::after {
+  opacity: 1;
+  animation: borderFlow 2.5s ease infinite;
+}
+
 .section-tab span {
   position: relative;
+  font-family: var(--font-display);
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
   transition: color var(--t-base) ease;
+  letter-spacing: -0.01em;
 }
 
 .section-tab small {
@@ -143,18 +227,18 @@
   font-size: var(--text-xs);
   color: var(--text-tertiary);
   transition: color var(--t-base) ease;
+  font-family: var(--font-mono);
 }
 
 .section-tab:hover {
-  border-color: var(--color-primary-border);
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-md), var(--shadow-glow);
+  transform: translateY(-2px);
 }
 
 .section-tab.active {
   border-color: transparent;
-  box-shadow: 0 4px 12px rgba(99,102,241,.3), var(--shadow-md);
-  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(192,57,43,.25), var(--shadow-md);
+  transform: translateY(-3px);
 }
 
 .section-tab.active::before {
@@ -167,7 +251,7 @@
 }
 
 .section-tab.active small {
-  color: rgba(255,255,255,.7);
+  color: rgba(255,255,255,.65);
 }
 
 .section-tab:focus-visible {
@@ -175,24 +259,27 @@
   box-shadow: var(--ring), var(--shadow-sm);
 }
 
-/* ── 11. Panel ─────────────────────────────────────────────── */
+/* ── Panel ──────────────────────────────────────────────────── */
 .panel {
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
-  border-radius: var(--r-xl);
-  padding: var(--sp-6);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--r-2xl);
+  padding: var(--sp-6) var(--sp-6);
+  box-shadow: var(--shadow-md);
+  animation: scaleIn var(--t-enter) var(--ease-out) both;
+  animation-delay: 60ms;
 }
 
 .panel-title {
   margin: 0 0 var(--sp-4);
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
   color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
-/* ── 12. Breadcrumbs ───────────────────────────────────────── */
+/* ── Breadcrumbs ────────────────────────────────────────────── */
 .breadcrumbs {
   display: flex;
   flex-wrap: wrap;
@@ -204,14 +291,16 @@
 .crumb-btn,
 .crumb-label,
 .crumb-step-btn {
-  padding: 3px var(--sp-2);
+  padding: 4px var(--sp-2);
   border-radius: var(--r-sm);
   border: 1px solid var(--border-subtle);
   background: var(--bg-subtle);
   color: var(--text-secondary);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
+  font-family: var(--font-mono);
   transition: all var(--t-fast) ease;
+  letter-spacing: 0.02em;
 }
 
 .crumb-btn,
@@ -237,4 +326,3 @@
   font-size: var(--text-xs);
   user-select: none;
 }
-

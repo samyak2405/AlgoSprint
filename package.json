@@ -1,0 +1,16 @@
+{
+  "name": "algosprint",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently --names \"HUB,LLD,SD\" --prefix-colors \"cyan,magenta,yellow\" \"npm run dev --prefix DSARevision\" \"npm run dev --prefix LLDDesign\" \"npm run dev --prefix SystemDesign\"",
+    "dev:hub": "npm run dev --prefix DSARevision",
+    "dev:lld": "npm run dev --prefix LLDDesign",
+    "dev:sd":  "npm run dev --prefix SystemDesign",
+    "build:lld": "npm run build --prefix LLDDesign",
+    "build:hub": "npm run build --prefix DSARevision",
+    "build:sd":  "npm run build --prefix SystemDesign"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

@@ -1,18 +1,21 @@
-/* ALGOSPRINT — split from styles.css for maintainability. */
+/* ALGOSPRINT — Decision Tree */
 
-/* ── 13. Decision Tree — Questions & Options ───────────────── */
+/* ── Question & Options ─────────────────────────────────────── */
 .question-row {
   display: flex;
   gap: var(--sp-3);
   align-items: flex-start;
-  margin-bottom: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  animation: fadeInUp var(--t-enter) var(--ease-out) both;
 }
 
 .question-row h3 {
+  font-family: var(--font-display);
   font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
   line-height: var(--leading-snug);
   color: var(--text-primary);
+  letter-spacing: -0.02em;
 }
 
 .icon {
@@ -40,17 +43,25 @@
   background: var(--bg-surface);
   color: var(--text-primary);
   text-align: left;
+  font-family: var(--font-sans);
   font-size: var(--text-base);
   font-weight: var(--weight-medium);
-  transition: all var(--t-base) ease;
+  transition: all var(--t-base) var(--ease-out);
   box-shadow: var(--shadow-xs);
+  animation: slideInRight var(--t-enter) var(--ease-out) both;
 }
+
+.options .option-btn:nth-child(1) { animation-delay: 40ms; }
+.options .option-btn:nth-child(2) { animation-delay: 90ms; }
+.options .option-btn:nth-child(3) { animation-delay: 140ms; }
+.options .option-btn:nth-child(4) { animation-delay: 190ms; }
+.options .option-btn:nth-child(5) { animation-delay: 240ms; }
 
 .option-btn:hover {
   border-color: var(--color-primary-border);
   background: var(--color-primary-subtle);
-  box-shadow: var(--shadow-sm);
-  transform: translateX(4px);
+  box-shadow: var(--shadow-sm), 0 0 0 1px var(--color-primary-border);
+  transform: translateX(6px);
 }
 
 .option-btn:focus-visible {
@@ -60,8 +71,8 @@
 
 .opt-char {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -72,24 +83,24 @@
   font-size: var(--text-xs);
   font-weight: var(--weight-bold);
   color: var(--text-secondary);
-  transition: all var(--t-base) ease;
+  transition: all var(--t-base) var(--ease-spring);
 }
 
 .option-btn:hover .opt-char {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: #fff;
+  transform: scale(1.08);
 }
 
 .arrow {
   margin-left: auto;
   color: var(--text-tertiary);
   font-size: var(--text-md);
-  transition: transform var(--t-base) ease, color var(--t-base) ease;
+  transition: transform var(--t-base) var(--ease-spring), color var(--t-base) ease;
 }
 
 .option-btn:hover .arrow {
   color: var(--color-primary);
-  transform: translateX(2px);
+  transform: translateX(4px);
 }
-

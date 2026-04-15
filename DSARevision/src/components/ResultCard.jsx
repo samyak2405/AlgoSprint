@@ -17,6 +17,7 @@ import { PriorityQueueVisualizer } from "./PriorityQueueVisualizer";
 import { RedBlackTreeVisualizer } from "./RedBlackTreeVisualizer";
 import { SortingVisualizer, SORTING_VISUALIZER_NAMES } from "./SortingVisualizer";
 import { GraphAlgorithmVisualizer, GRAPH_VIZ_NAMES } from "./GraphAlgorithmVisualizer";
+import { PatternVisualizer, PATTERN_VIZ_NAMES } from "./PatternVisualizer";
 
 function getProblemLadder(result) {
   const byName = {
@@ -850,6 +851,7 @@ export function ResultCard({ result, onReset, getCodeVariants, renderHighlighted
       {result.name === "Red-Black Tree (via TreeMap/TreeSet)" ? <RedBlackTreeVisualizer /> : null}
       {SORTING_VISUALIZER_NAMES.has(result.name) ? <SortingVisualizer algorithmName={result.name} /> : null}
       {GRAPH_VIZ_NAMES.has(result.name) ? <GraphAlgorithmVisualizer algorithm={result.name} /> : null}
+      {PATTERN_VIZ_NAMES.has(result.name) ? <PatternVisualizer patternName={result.name} /> : null}
       <button className="ghost-btn center-btn" onClick={onReset}>
         Start over
       </button>

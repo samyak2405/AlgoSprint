@@ -8,8 +8,43 @@ services:
       - "5173:5173"
     environment:
       - NODE_ENV=development
+      - LLD_TARGET=http://lld-web:3002
+      - SD_TARGET=http://system-design-web:3000
     volumes:
       - .:/app
+      - /app/node_modules
+    command: npm run dev
+    restart: unless-stopped
+    depends_on:
+      - lld-web
+      - system-design-web
+
+  lld-web:
+    build:
+      context: ../LLDDesign
+      dockerfile: Dockerfile
+    container_name: lld-web
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ../LLDDesign:/app
+      - /app/node_modules
+    command: npm run dev
+    restart: unless-stopped
+
+  system-design-web:
+    build:
+      context: ../SystemDesign
+      dockerfile: Dockerfile
+    container_name: system-design-web
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - ../SystemDesign:/app
       - /app/node_modules
     command: npm run dev
     restart: unless-stopped

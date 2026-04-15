@@ -1,0 +1,27 @@
+services:
+  hub:
+    build:
+      context: ./DSARevision
+    ports:
+      - "4173:4173"
+    environment:
+      - SD_TARGET=http://system-design:3000
+      - LLD_TARGET=http://lld:4002
+    depends_on:
+      - system-design
+      - lld
+    restart: unless-stopped
+
+  system-design:
+    build:
+      context: ./SystemDesign
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  lld:
+    build:
+      context: ./LLDDesign
+    ports:
+      - "4002:4002"
+    restart: unless-stopped
