@@ -15,8 +15,7 @@ ul, ol { list-style: none; }
 img { display: block; max-width: 100%; }
 
 /* ── Layout ─────────────────────────────────── */
-.app-root { min-height: 100vh; display: flex; flex-direction: column; }
-.app-main  { flex: 1; }
+/* app-root and app-main layout is handled by 03-navbar.css (sidebar layout) */
 .container { max-width: 1100px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 48px); }
 
 /* ── Shared Typography ──────────────────────── */

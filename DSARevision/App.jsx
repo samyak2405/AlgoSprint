@@ -111,7 +111,9 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [cueText, setCueText] = useState("");
-  const [theme, setTheme] = useState("light");
+  const [theme, setTheme] = useState(() => {
+    try { return localStorage.getItem("algosprint-theme") || "light"; } catch { return "light"; }
+  });
   const [objectiveView, setObjectiveView] = useState("core");
 
   const searchIndex = useMemo(() => buildSearchIndex(SECTIONS), []);
@@ -134,6 +136,7 @@ export default function App() {
     const root = document.documentElement;
     if (theme === "system") root.removeAttribute("data-theme");
     else root.setAttribute("data-theme", theme);
+    try { localStorage.setItem("algosprint-theme", theme); } catch {}
   }, [theme]);
 
   useKeyboardNavigation({

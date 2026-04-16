@@ -10,7 +10,7 @@ import Approach from "./pages/Approach.jsx";
 
 export default function App() {
   const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem("lld-theme") || "light"; } catch { return "light"; }
+    try { return localStorage.getItem("algosprint-theme") || "light"; } catch { return "light"; }
   });
 
   const toggleTheme = useCallback(() => {
@@ -19,7 +19,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    try { localStorage.setItem("lld-theme", theme); } catch {}
+    try { localStorage.setItem("algosprint-theme", theme); } catch {}
   }, [theme]);
 
   return (

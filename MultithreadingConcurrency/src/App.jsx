@@ -11,10 +11,12 @@ import PatternDetail from "./pages/PatternDetail.jsx";
 import Problems from "./pages/Problems.jsx";
 import ProblemDetail from "./pages/ProblemDetail.jsx";
 import Revision from "./pages/Revision.jsx";
+import Compare from "./pages/Compare.jsx";
+import Interview from "./pages/Interview.jsx";
 
 export default function App() {
   const [theme, setTheme] = useState(() => {
-    try { return localStorage.getItem("mt-theme") || "light"; } catch { return "light"; }
+    try { return localStorage.getItem("algosprint-theme") || "light"; } catch { return "light"; }
   });
 
   const toggleTheme = useCallback(() => {
@@ -23,7 +25,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
-    try { localStorage.setItem("mt-theme", theme); } catch {}
+    try { localStorage.setItem("algosprint-theme", theme); } catch {}
   }, [theme]);
 
   return (
@@ -41,6 +43,8 @@ export default function App() {
           <Route path="/problems" element={<Problems />} />
           <Route path="/problems/:id" element={<ProblemDetail />} />
           <Route path="/revision" element={<Revision />} />
+          <Route path="/compare" element={<Compare />} />
+          <Route path="/interview" element={<Interview />} />
         </Routes>
       </main>
     </div>

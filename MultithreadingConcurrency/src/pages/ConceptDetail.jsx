@@ -108,6 +108,36 @@ export default function ConceptDetail() {
           )}
         </section>
 
+        {/* Best Practices */}
+        {concept.bestPractices?.length > 0 && (
+          <div className="detail-best-practices">
+            <span className="detail-best-practices-label">Best Practices</span>
+            <ul className="detail-best-practices-list">
+              {concept.bestPractices.map((p, i) => <li key={i}>{p}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Thumb Rules */}
+        {concept.thumbRules?.length > 0 && (
+          <div className="detail-thumb-rules">
+            <span className="detail-thumb-rules-label">Thumb Rules</span>
+            <ul className="detail-thumb-rules-list">
+              {concept.thumbRules.map((r, i) => <li key={i}>{r}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Hidden Truths */}
+        {concept.hiddenTruths?.length > 0 && (
+          <div className="detail-hidden-truths">
+            <span className="detail-hidden-truths-label">Hidden Truths</span>
+            <ul className="detail-hidden-truths-list">
+              {concept.hiddenTruths.map((t, i) => <li key={i}>{t}</li>)}
+            </ul>
+          </div>
+        )}
+
         {/* Gotcha */}
         <div className="detail-gotcha">
           <span className="detail-gotcha-label">Gotcha</span>

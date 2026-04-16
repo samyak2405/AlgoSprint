@@ -88,6 +88,36 @@ export default function ProblemDetail() {
             <CodeBlock code={problem.solution} />
           )}
         </section>
+
+        {/* Best Practices */}
+        {problem.bestPractices?.length > 0 && (
+          <div className="detail-best-practices">
+            <span className="detail-best-practices-label">Best Practices</span>
+            <ul className="detail-best-practices-list">
+              {problem.bestPractices.map((p, i) => <li key={i}>{p}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Lessons */}
+        {problem.lessons?.length > 0 && (
+          <div className="detail-lessons">
+            <span className="detail-lessons-label">What to Learn From This Problem</span>
+            <ul className="detail-lessons-list">
+              {problem.lessons.map((l, i) => <li key={i}>{l}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Hidden Truths */}
+        {problem.hiddenTruths?.length > 0 && (
+          <div className="detail-hidden-truths">
+            <span className="detail-hidden-truths-label">Hidden Truths</span>
+            <ul className="detail-hidden-truths-list">
+              {problem.hiddenTruths.map((t, i) => <li key={i}>{t}</li>)}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="detail-nav">

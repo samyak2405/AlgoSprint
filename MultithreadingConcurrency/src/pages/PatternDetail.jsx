@@ -110,6 +110,36 @@ export default function PatternDetail() {
           <span className="detail-takeaway-label">Trade-offs</span>
           <p>{pattern.tradeoffs}</p>
         </div>
+
+        {/* Best Practices */}
+        {pattern.bestPractices?.length > 0 && (
+          <div className="detail-best-practices">
+            <span className="detail-best-practices-label">Best Practices</span>
+            <ul className="detail-best-practices-list">
+              {pattern.bestPractices.map((p, i) => <li key={i}>{p}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Thumb Rules */}
+        {pattern.thumbRules?.length > 0 && (
+          <div className="detail-thumb-rules">
+            <span className="detail-thumb-rules-label">Thumb Rules</span>
+            <ul className="detail-thumb-rules-list">
+              {pattern.thumbRules.map((r, i) => <li key={i}>{r}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Hidden Truths */}
+        {pattern.hiddenTruths?.length > 0 && (
+          <div className="detail-hidden-truths">
+            <span className="detail-hidden-truths-label">Hidden Truths</span>
+            <ul className="detail-hidden-truths-list">
+              {pattern.hiddenTruths.map((t, i) => <li key={i}>{t}</li>)}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="detail-nav">

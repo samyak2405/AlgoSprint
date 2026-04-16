@@ -93,11 +93,41 @@ export default function ApiDetail() {
         </section>
 
         {/* Pitfalls */}
-        {api.pitfalls && api.pitfalls.length > 0 && (
+        {api.pitfalls?.length > 0 && (
           <div className="detail-gotcha">
             <span className="detail-gotcha-label">Common Pitfalls</span>
             <ul className="detail-list detail-list--cross" style={{ marginTop: 10 }}>
               {api.pitfalls.map((p, i) => <li key={i}>{p}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Best Practices */}
+        {api.bestPractices?.length > 0 && (
+          <div className="detail-best-practices">
+            <span className="detail-best-practices-label">Best Practices</span>
+            <ul className="detail-best-practices-list">
+              {api.bestPractices.map((p, i) => <li key={i}>{p}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Thumb Rules */}
+        {api.thumbRules?.length > 0 && (
+          <div className="detail-thumb-rules">
+            <span className="detail-thumb-rules-label">Thumb Rules</span>
+            <ul className="detail-thumb-rules-list">
+              {api.thumbRules.map((r, i) => <li key={i}>{r}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {/* Hidden Truths */}
+        {api.hiddenTruths?.length > 0 && (
+          <div className="detail-hidden-truths">
+            <span className="detail-hidden-truths-label">Hidden Truths</span>
+            <ul className="detail-hidden-truths-list">
+              {api.hiddenTruths.map((t, i) => <li key={i}>{t}</li>)}
             </ul>
           </div>
         )}

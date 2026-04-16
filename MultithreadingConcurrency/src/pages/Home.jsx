@@ -56,10 +56,30 @@ const SECTIONS = [
     stat: "all topics",
     accent: "var(--ink-2)",
   },
+  {
+    to: "/compare",
+    number: "06",
+    title: "Comparison Tables",
+    subtitle: "Side-by-Side",
+    description:
+      "synchronized vs ReentrantLock vs StampedLock, CountDownLatch vs CyclicBarrier vs Phaser, Platform Thread vs Virtual Thread — choose the right tool.",
+    stat: "7 tables",
+    accent: "#A78BFA",
+  },
+  {
+    to: "/interview",
+    number: "07",
+    title: "Interview Prep",
+    subtitle: "Top Questions",
+    description:
+      "Top 15 concurrency interview questions with model answers, examiner traps, and design templates.",
+    stat: "15 questions",
+    accent: "#F472B6",
+  },
 ];
 
 const STATS = [
-  { value: "6",  label: "Thread States" },
+  { value: `${CONCEPTS.length}`,  label: "Concepts" },
   { value: `${JAVA_API.length}`,  label: "JUC Classes" },
   { value: `${PATTERNS.length}`,  label: "Patterns" },
   { value: `${PROBLEMS.length}`,  label: "Problems" },

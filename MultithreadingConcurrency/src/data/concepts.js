@@ -53,6 +53,24 @@ export const CONCEPTS = [
 }`,
       },
     ],
+    bestPractices: [
+      "Name every thread (Thread.Builder.name() or thread.setName()) — anonymous threads make production thread dumps unreadable",
+      "Use jstack <pid> or kill -3 <pid> to capture thread dumps when a production JVM hangs — it shows every thread state",
+      "Set UncaughtExceptionHandler globally (Thread.setDefaultUncaughtExceptionHandler) so silent thread crashes are logged",
+      "Prefer virtual threads (Java 21) for I/O-bound tasks — a blocked virtual thread does NOT consume an OS thread slot",
+    ],
+    thumbRules: [
+      "Thread BLOCKED for > 1s → likely deadlock or severe lock contention — check what lock it's waiting on",
+      "Thread in WAITING indefinitely → check what condition or object it's waiting on — may be a missed notify()",
+      "Thread in RUNNABLE but no progress → likely busy-spinning — look for hot loops without any blocking",
+      "Thread in TIMED_WAITING inside synchronized → sleep() inside a synchronized block — other threads are locked out",
+    ],
+    hiddenTruths: [
+      "A thread in NEW state has NO OS thread yet. start() is what creates the OS thread — NEW is just a Java object.",
+      "RUNNABLE threads can be preempted by the OS scheduler at any bytecode boundary. You cannot assume which line a RUNNABLE thread is executing.",
+      "A thread interrupted while in TIMED_WAITING (sleep/wait with timeout) wakes IMMEDIATELY and throws InterruptedException — it does not wait for the timeout to expire.",
+      "Thread.stop() (deprecated since Java 1.2) can corrupt object state — it forcibly unwinds the stack and releases all locks mid-write, leaving objects in broken intermediate states. Always use interrupt() for cooperative cancellation.",
+    ],
     gotcha:
       "RUNNABLE does NOT mean the thread is currently executing. The OS may have preempted it. A thread in RUNNABLE is either on-CPU or in the OS ready queue.",
     takeaway:
@@ -222,10 +240,317 @@ Thread.ofPlatform().daemon(true).name("log-flusher").start(() -> flushLoop());
 // Rule: if the task MUST complete (payment, write-to-DB), it must be non-daemon`,
       },
     ],
+    bestPractices: [
+      "In production code, always submit tasks to an ExecutorService — never create raw Thread objects for recurring work",
+      "Always name your threads: Thread.Builder.name() or thread.setName('service-worker-') — mandatory for readable thread dumps",
+      "Set UncaughtExceptionHandler on every pool via ThreadFactory — silent crashes are the #1 hidden reliability bug",
+      "Use try-with-resources for ExecutorService (Java 19+) or explicitly call shutdown() in a finally block / shutdown hook",
+      "Always use the get(timeout, unit) overload of Future — never future.get() without timeout in production code",
+    ],
+    thumbRules: [
+      "Task returns a value or throws checked exceptions → Callable + Future, not Runnable",
+      "Task runs on a repeating schedule → ScheduledExecutorService, not Thread + sleep() loop",
+      "Task is one-shot and short-lived → lambda + executor.submit()",
+      "Migrating blocking I/O code to Java 21 → swap newFixedThreadPool for newVirtualThreadPerTaskExecutor — one line change",
+      "Need precise control over naming, daemon flag, virtual vs platform → Thread.Builder API",
+    ],
+    hiddenTruths: [
+      "Calling thread.run() directly does NOT create a new thread — it executes in the calling thread. The code works but is entirely sequential. This is a silent bug that passes all tests.",
+      "Thread IDs (Thread.getId()) are NEVER reused within a JVM session — even after a thread terminates, its ID is permanently retired.",
+      "Thread.Builder.ofVirtual().start(r) creates AND starts the virtual thread in one call — there is no separate start() needed.",
+      "A FutureTask wrapping a Callable IS a Runnable — you can pass it to new Thread(futureTask).start() AND call futureTask.get() to retrieve the result. It bridges both worlds.",
+      "Executors.newCachedThreadPool() can create thousands of OS threads within seconds under sustained load — it's dangerous without an external rate limit or circuit breaker.",
+    ],
     gotcha:
       "setDaemon(true) must be called BEFORE start(). Calling it after start() throws IllegalThreadStateException. Also: thread subclasses (extends Thread) make Callable impossible — you'd need a FutureTask wrapper anyway.",
     takeaway:
       "In modern Java: use lambdas + ExecutorService for production tasks. Use Thread.Builder when you need explicit naming or daemon control. Use Callable when the task returns a value. Never subclass Thread.",
+  },
+
+  {
+    id: "types-of-threads",
+    title: "Types of Threads & Real-World Usage",
+    category: "Fundamentals",
+    tags: ["platform thread", "virtual thread", "daemon", "main thread", "ForkJoin", "carrier thread", "thread pool", "scheduled thread"],
+    definition:
+      "Java has distinct thread types that differ in how they're created, who manages them, how much memory they use, and what workloads they're suited for. Choosing the wrong thread type for a workload is one of the most common sources of scalability problems — a thread pool sized for CPU work collapses under I/O load, and virtual threads give zero benefit on CPU-bound tasks.",
+    whenToUse: [
+      "HTTP request handler with blocking DB/HTTP calls → Virtual thread (Java 21) or bounded platform thread pool",
+      "CPU-heavy work (image processing, cryptography, ML inference) → Platform thread pool sized to CPU core count",
+      "Background housekeeping (log flusher, metrics reporter, heartbeat) → Daemon thread",
+      "Periodic recurring tasks (cache refresh, health check, cleanup job) → ScheduledExecutorService thread",
+      "Parallel divide-and-conquer algorithms (parallel sort, parallel streams) → ForkJoin worker thread",
+      "Startup / orchestration logic → Main thread (then hand off to pools)",
+    ],
+    howToThink: [
+      "Platform thread = 1 OS thread = ~1 MB stack. Creating thousands is fine; millions will OOM.",
+      "Virtual thread = JVM fiber = ~few KB. Creating millions is fine. Automatically unmounts from its carrier when blocked on I/O.",
+      "Daemon vs Non-Daemon is not about performance — it controls whether the JVM waits for the thread to finish before exit.",
+      "A ForkJoin worker thread is a platform thread in a work-stealing pool. It's what runs parallel streams, CompletableFuture.supplyAsync(), and RecursiveTasks.",
+      "A carrier thread is an OS thread that virtual threads mount onto. You never create carriers directly — the JVM manages them.",
+      "Thread pool threads are platform threads reused across tasks. Reuse amortizes creation cost but ties up OS threads when tasks block on I/O.",
+    ],
+    codeExamples: [
+      {
+        title: "Main Thread — Application Entry Point",
+        description: "The JVM starts with one non-daemon platform thread: the main thread. It runs main() and typically bootstraps the application — creates thread pools, starts the server, loads configuration. Everything else branches from it.",
+        code: `public class Application {
+    public static void main(String[] args) {
+        // This IS the main thread
+        System.out.println("Thread: " + Thread.currentThread().getName());  // "main"
+        System.out.println("Daemon: " + Thread.currentThread().isDaemon()); // false
+        System.out.println("ID:     " + Thread.currentThread().getId());    // 1 (always)
+
+        // Main thread bootstraps and delegates work to pools
+        ExecutorService requestPool = Executors.newFixedThreadPool(10);
+        startWebServer(requestPool);
+
+        // JVM stays alive until all non-daemon threads (including requestPool threads) finish
+    }
+}
+
+// Real-world: Spring Boot, Quarkus, plain main() all start here
+// Rule: keep main() thin — validate config, create pools, start the server, then block or exit`,
+      },
+      {
+        title: "Platform Thread (User / Non-Daemon) — Blocking Work, Bounded Pool",
+        description: "The classic Java thread — backed 1:1 by an OS thread. ~1 MB stack each. JVM waits for all non-daemon platform threads before exiting. Use a bounded pool for CPU-bound tasks or legacy blocking code that can't migrate to virtual threads.",
+        code: `// Platform thread — 1:1 with an OS thread, ~1 MB stack
+Thread t = Thread.ofPlatform()
+    .name("payment-worker")
+    .daemon(false)          // non-daemon: JVM waits for it
+    .start(() -> processPayment(order));
+
+// Production: use a bounded pool to cap resource usage
+ExecutorService cpuPool = Executors.newFixedThreadPool(
+    Runtime.getRuntime().availableProcessors() // # of CPU cores
+);
+
+// Real-world use cases for platform threads:
+// ✓ CPU-bound: image encoding, cryptography, ML inference, compression
+// ✓ Legacy blocking code that uses synchronized and can't be refactored easily
+// ✓ Any task where you need a bounded concurrency cap
+// ✗ NOT for thousands of simultaneous I/O-blocking tasks (use virtual threads)`,
+      },
+      {
+        title: "Daemon Thread — Background Housekeeping",
+        description: "A daemon thread is a background service that the JVM silently kills when all non-daemon (user) threads have exited. It runs alongside the application but must not do work that needs to complete — if the JVM exits, daemon finally blocks may not run.",
+        code: `// Daemon thread — killed when all user threads finish
+Thread metricsReporter = Thread.ofPlatform()
+    .name("metrics-reporter")
+    .daemon(true)           // MUST be set before start()
+    .start(() -> {
+        while (true) {
+            try {
+                flushMetricsToPrometheus();
+                Thread.sleep(10_000);   // report every 10 seconds
+            } catch (InterruptedException e) {
+                break;
+            }
+        }
+    });
+
+// Real-world daemon thread use cases:
+// ✓ Metrics flusher / log buffer flusher
+// ✓ Heartbeat / keep-alive sender
+// ✓ Garbage collection helpers
+// ✓ IDE background indexer
+// ✓ Cache TTL eviction loop
+
+// Real-world NON-daemon use cases (must complete):
+// ✗ Writing a payment record to DB — use non-daemon; JVM must wait
+// ✗ Flushing a message to Kafka — use non-daemon or shutdown hook`,
+      },
+      {
+        title: "Thread Pool Thread — Reused Platform Threads",
+        description: "ExecutorService maintains a pool of platform threads that are reused across tasks. Thread creation cost is paid once at startup. Use for short-to-medium tasks. Under sustained blocking I/O, pool threads sit idle waiting — this is where virtual threads win.",
+        code: `// Fixed pool: good for CPU-bound work — matches hardware parallelism
+ExecutorService cpuPool = Executors.newFixedThreadPool(
+    Runtime.getRuntime().availableProcessors() + 1
+);
+
+// Cached pool: creates threads on demand, reuses idle ones — short I/O bursts
+ExecutorService burstPool = Executors.newCachedThreadPool();
+// ⚠ Unbounded — can exhaust OS thread limit under sustained load
+
+// Production pool with custom settings
+ThreadPoolExecutor httpPool = new ThreadPoolExecutor(
+    50,                              // core: always-alive threads (sized for normal load)
+    200,                             // max: burst capacity
+    60L, TimeUnit.SECONDS,           // idle timeout for extra threads
+    new LinkedBlockingQueue<>(1000), // bounded queue — back-pressure when all threads busy
+    r -> {
+        Thread t = new Thread(r);
+        t.setName("http-handler-" + t.getId());
+        t.setDaemon(false);
+        return t;
+    },
+    new ThreadPoolExecutor.CallerRunsPolicy() // if full: caller thread handles the task
+);
+
+// Real-world: Spring MVC (Tomcat default), gRPC servers, JDBC connection pools`,
+      },
+      {
+        title: "Virtual Thread — I/O-Bound Scale (Java 21)",
+        description: "Virtual threads are JVM-managed fibers (~KB each). When they block on I/O, they unmount from their carrier OS thread — the carrier is free to run other virtual threads. One virtual thread per request scales to C10K+ without pool sizing headaches.",
+        code: `// Virtual thread — JVM-managed, ~KB each, millions can coexist
+Thread vt = Thread.ofVirtual()
+    .name("request-handler-", 0)
+    .start(() -> handleRequest(request)); // blocks on DB/HTTP? Carrier is freed
+
+// Production: submit tasks to the executor — creates one VT per task
+try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+    for (HttpRequest req : incomingRequests) {
+        executor.submit(() -> {
+            // This blocks on a database call
+            User user = db.findUser(req.getUserId());    // I/O block → VT unmounts
+            Order order = db.findOrder(req.getOrderId()); // I/O block → VT unmounts
+            return buildResponse(user, order);
+        });
+    }
+}
+
+// Spring Boot 3.2+ — one line migration
+// application.properties: spring.threads.virtual.enabled=true
+
+// Real-world: REST API servers, microservices with DB/cache calls, gRPC services
+// NOT for: CPU-heavy image processing, ML inference, cryptography (use platform threads)`,
+      },
+      {
+        title: "ForkJoin Worker Thread — Parallel Computation",
+        description: "ForkJoinPool workers are platform threads in a work-stealing pool. When a worker runs out of tasks, it steals from a busier worker's queue. These are the threads behind parallel streams, CompletableFuture.supplyAsync(), and RecursiveTask. You rarely create them directly.",
+        code: `import java.util.concurrent.*;
+import java.util.Arrays;
+
+// ForkJoin RecursiveTask — parallel array sum
+class ParallelSum extends RecursiveTask<Long> {
+    private final long[] data;
+    private final int start, end;
+    static final int THRESHOLD = 10_000;
+
+    ParallelSum(long[] data, int start, int end) {
+        this.data = data; this.start = start; this.end = end;
+    }
+
+    @Override
+    protected Long compute() {
+        if (end - start <= THRESHOLD) {
+            // Small enough — do sequentially on this ForkJoin worker thread
+            long sum = 0;
+            for (int i = start; i < end; i++) sum += data[i];
+            return sum;
+        }
+        int mid = (start + end) / 2;
+        ParallelSum left  = new ParallelSum(data, start, mid);
+        ParallelSum right = new ParallelSum(data, mid, end);
+        left.fork();                        // submit left to another worker (async)
+        return right.compute() + left.join(); // compute right here, wait for left
+    }
+}
+
+// Used automatically by:
+long[] arr = new long[10_000_000];
+Arrays.parallelSort(arr);                   // ForkJoin worker threads
+Arrays.stream(arr).parallel().sum();        // ForkJoin common pool
+CompletableFuture.supplyAsync(() -> compute()); // ForkJoin common pool
+
+// Real-world: parallel streams in analytics pipelines, parallel sort, image pixel processing`,
+      },
+      {
+        title: "Scheduled Thread — Periodic & Delayed Tasks",
+        description: "ScheduledExecutorService runs tasks at a fixed rate or after a delay. It replaced java.util.Timer (which was single-threaded and swallowed exceptions). Use scheduleAtFixedRate for periodic jobs and schedule for one-shot delayed tasks.",
+        code: `import java.util.concurrent.*;
+
+ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(4);
+
+// One-shot: run once after 5 seconds
+scheduler.schedule(
+    () -> sendWelcomeEmail(userId),
+    5, TimeUnit.SECONDS
+);
+
+// Fixed rate: run every 30 seconds regardless of how long the task takes
+// If task takes > 30s, next run starts immediately (no gap)
+ScheduledFuture<?> healthCheck = scheduler.scheduleAtFixedRate(
+    () -> pingDependencies(),
+    0,   // initial delay
+    30,  TimeUnit.SECONDS
+);
+
+// Fixed delay: wait 30 seconds AFTER each run completes before starting the next
+scheduler.scheduleWithFixedDelay(
+    () -> cleanExpiredSessions(),
+    0, 30, TimeUnit.SECONDS
+);
+
+// Real-world use cases:
+// ✓ Health checks, readiness probes
+// ✓ Cache refresh (reload config every 60s)
+// ✓ Session cleanup, token expiry
+// ✓ Metrics aggregation window
+// ✓ Retry scheduler for failed operations`,
+      },
+      {
+        title: "Carrier Thread — The OS Thread Under Virtual Threads",
+        description: "A carrier thread is the OS platform thread that a virtual thread runs on. The JVM maintains a small pool of carrier threads (default: one per CPU core, backed by ForkJoinPool). You never create or interact with carriers directly — but understanding them explains virtual thread pinning.",
+        code: `// Carrier threads are managed by the JVM — you never create them directly
+// They live in a ForkJoinPool with parallelism = Runtime.availableProcessors()
+
+// How mounting/unmounting works:
+void handleRequest() {
+    // Virtual thread running on carrier thread #3
+    String data = callHttpApi();   // blocks on network I/O
+    // ↑ VT UNMOUNTS from carrier #3 here
+    // ↑ Carrier #3 is NOW FREE to run another virtual thread
+
+    // ... network response arrives ...
+    // ↑ VT REMOUNTS onto ANY available carrier (may be #3, #1, or #7)
+
+    String result = processData(data); // CPU work — VT stays mounted
+}
+
+// You can observe carrier threads in thread dumps — they appear as:
+// "ForkJoinPool-1-worker-1" mounting virtual threads
+
+// Pinning — virtual thread CANNOT unmount from its carrier:
+synchronized (myLock) {
+    callHttpApi();  // carrier is stuck here — PINNING. Bad for throughput.
+}
+
+// Fix: use ReentrantLock so VT can unmount while waiting for I/O
+lock.lock();
+try {
+    callHttpApi();  // carrier is FREE — VT unmounts
+} finally { lock.unlock(); }
+
+// Check pinning events: -Djdk.tracePinnedThreads=full`,
+      },
+    ],
+    bestPractices: [
+      "Match thread type to workload before writing a single line: I/O → virtual, CPU → platform pool, periodic → scheduled, divide-and-conquer → ForkJoin",
+      "Size platform thread pools to CPU cores for CPU-bound work: Runtime.getRuntime().availableProcessors() — more threads won't help and will cause contention",
+      "setDaemon(true) MUST be called before start() — daemon status cannot be changed after a thread starts",
+      "Name every thread pool with a custom ThreadFactory — 'http-handler-3' in a thread dump is worth 100x more than 'pool-1-thread-3'",
+      "When adopting virtual threads, audit all libraries for synchronized blocks that could cause pinning — replace with ReentrantLock",
+    ],
+    thumbRules: [
+      "I/O-bound task (DB, HTTP, file, network) → Virtual thread (Java 21) — unlimited concurrency, minimal memory",
+      "CPU-bound task (image processing, crypto, ML) → Platform thread pool sized to core count — more threads = more contention, not more speed",
+      "Background housekeeping that MUST NOT delay JVM shutdown → Daemon thread",
+      "Background housekeeping that MUST complete before JVM exits → Non-daemon thread (or shutdown hook)",
+      "Divide-and-conquer parallel computation → ForkJoinPool (via parallel streams or RecursiveTask) — don't use a regular executor",
+    ],
+    hiddenTruths: [
+      "Virtual threads give ZERO performance benefit for CPU-bound work. The JVM still has one carrier thread per CPU core. Virtual threads multiply I/O concurrency — they don't add CPU parallelism.",
+      "The ForkJoin common pool is shared by ALL parallel streams, CompletableFuture.supplyAsync(), and Arrays.parallelSort() in your entire JVM. One slow blocking task in the common pool can stall all parallel streams.",
+      "A carrier thread pool is not your application's thread pool — carrier threads are managed by the JVM (backed by a ForkJoinPool) and you cannot submit tasks to them. They're invisible infrastructure.",
+      "Thread pool threads blocking on synchronized blocks prevent virtual threads from unmounting — migrating to virtual threads requires auditing every library your code calls for synchronized usage.",
+      "Daemon threads are silently killed even if they hold resources (file handles, DB connections, uncommitted transactions). The JVM does NOT run daemon thread's finally blocks during abrupt shutdown.",
+    ],
+    gotcha:
+      "Virtual threads give ZERO benefit for CPU-bound work — the JVM has the same number of carrier threads as CPU cores regardless. Putting CPU-heavy tasks on virtual threads just competes for carrier slots. Match thread type to workload: platform for CPU, virtual for I/O.",
+    takeaway:
+      "Decision tree: Is the task I/O-bound? → Virtual thread. Is it CPU-bound? → Platform thread pool sized to core count. Does it run forever in the background? → Daemon thread. Does it run periodically? → ScheduledExecutorService. Does it do divide-and-conquer computation? → ForkJoinPool (via parallel streams or RecursiveTask).",
   },
 
   {
@@ -409,6 +734,27 @@ low.setPriority(Thread.MIN_PRIORITY);   // 1
 // Use fair queues, executors, or explicit coordination instead`,
       },
     ],
+    bestPractices: [
+      "Prefer BlockingQueue (LinkedBlockingQueue, ArrayBlockingQueue) over wait/notify for producer-consumer — it handles all edge cases correctly",
+      "Never swallow InterruptedException — always either re-throw it or restore the flag with Thread.currentThread().interrupt()",
+      "Always check Thread.currentThread().isInterrupted() in long-running non-blocking loops — the only way interrupt works for non-blocking code",
+      "Use Condition objects (from ReentrantLock.newCondition()) instead of wait/notify in new code — multiple condition queues on one lock, more debuggable",
+      "Always use join(timeout) in production — join() with no timeout blocks forever if the joined thread deadlocks",
+    ],
+    thumbRules: [
+      "Need to pass data between threads? → BlockingQueue.put()/take() — never shared variable + wait/notify",
+      "Need to signal N threads simultaneously to start? → CountDownLatch(1).countDown()",
+      "Need to cancel a background thread? → interrupt() + check isInterrupted() in the loop body",
+      "Need a result from a thread? → CompletableFuture or Future<T> — not join() + shared field",
+      "Two threads need to swap objects? → Exchanger<T> (the only safe two-thread swap primitive)",
+    ],
+    hiddenTruths: [
+      "Thread.interrupted() (static) reads AND CLEARS the interrupt flag. thread.isInterrupted() (instance) reads WITHOUT clearing. Mixing them up is one of the most common concurrency bugs — a cleared flag means the interrupt is permanently lost.",
+      "When a thread calling wait() is interrupted, it throws InterruptedException AND the interrupt flag is cleared BEFORE the exception is thrown. If you catch it without restoring the flag, the interrupt silently disappears.",
+      "notify() can cause permanent livelock if different threads wait on the same lock for DIFFERENT conditions. One wrong notify() wakes the wrong waiter, which goes back to sleep — nobody makes progress.",
+      "join() with no argument blocks the caller indefinitely. If the joined thread deadlocks, your thread deadlocks with it. In production, always join(5000) with a fallback timeout path.",
+      "sleep() holds all locks the thread currently owns. wait() releases the SINGLE lock you called it on. A thread can hold multiple locks and call wait() — the OTHER locks are still held, potentially causing contention.",
+    ],
     gotcha:
       "Never call wait() in an if() block — always while(). Spurious wakeups are guaranteed by the JVM spec to be possible. Also: sleep() does NOT release locks; wait() does. Confusing these is a classic deadlock source.",
     takeaway:
@@ -465,6 +811,26 @@ low.setPriority(Thread.MIN_PRIORITY);   // 1
     // Monitor lock/unlock establishes happens-before — write is visible on next lock
 }`,
       },
+    ],
+    bestPractices: [
+      "When in doubt about whether synchronization is needed: if two threads share a variable and at least one writes, you MUST synchronize",
+      "Use volatile for simple flags; AtomicXxx for counters/single variables with compound ops; synchronized/locks for multi-variable atomicity",
+      "Declare final fields for all state that doesn't change after construction — final fields have special happens-before guarantees",
+      "When publishing a mutable object to another thread, either synchronize the publication point or make the object immutable",
+      "Use static initializers or Initialization-on-demand holder for lazy singletons — they are class-loader-synchronized for free",
+    ],
+    thumbRules: [
+      "Two threads share one variable, one writes → volatile is sufficient for visibility",
+      "Counter incremented by multiple threads → AtomicInteger, NOT volatile int",
+      "Multiple variables must be updated as a unit → synchronized block or lock",
+      "Object published to another thread after construction → volatile reference OR synchronize the publication",
+      "Lazy singleton initialization → Initialization-on-demand holder pattern (safest) or volatile + DCL",
+    ],
+    hiddenTruths: [
+      "long and double reads/writes are NOT atomic on 32-bit JVMs — the JVM can split a 64-bit value into two 32-bit halves and write them separately. Another thread can read a half-written value. Use volatile long or AtomicLong for shared 64-bit values.",
+      "The JVM and CPU can reorder instructions within a thread as long as the observed result within that thread appears correct. This reordering IS visible to other threads and causes data races — the JMM exists to define exactly when this is safe.",
+      "new MyObject() is NOT atomic. It expands to: allocate memory → run constructor (write fields) → assign reference. Without volatile, another thread can see the reference BEFORE the constructor finishes, reading a partially initialized object.",
+      "Static initializers are thread-safe — they run under the class loader's lock. However, if two static initializers depend on each other (class A's static init calls class B, whose static init calls class A), you get a class-loading deadlock.",
     ],
     gotcha:
       "volatile prevents reordering and ensures visibility, but it does NOT make compound operations atomic. i++ on a volatile int is still a race condition (read-modify-write is three steps).",
@@ -550,6 +916,27 @@ low.setPriority(Thread.MIN_PRIORITY);   // 1
 }`,
       },
     ],
+    bestPractices: [
+      "Use a private final Object lock = new Object() instead of synchronizing on 'this' — prevents external callers from accidentally holding your lock",
+      "Keep synchronized blocks as small as possible — only the minimal code that needs mutual exclusion",
+      "Always use while(condition) wait() — never if(condition). Spurious wakeups and multi-condition locks make if() dangerous",
+      "Prefer synchronized blocks over synchronized methods — methods lock on 'this' and you can't narrow scope",
+      "Release locks as quickly as possible — never do I/O (logging, DB calls, HTTP) inside a synchronized block",
+    ],
+    thumbRules: [
+      "Protecting one shared variable with no compound ops → AtomicXxx is better (lock-free, higher throughput)",
+      "Protecting multiple variables as an atomic unit → synchronized block on a private lock",
+      "Need wait/notify? → synchronized is required (the only way to call wait/notify)",
+      "Need tryLock(), timeout, fairness, or multiple condition queues? → ReentrantLock instead",
+      "Static shared state → synchronized(MyClass.class) or a static final lock object",
+    ],
+    hiddenTruths: [
+      "Synchronizing on String literals is dangerous. String literals are interned and shared across class loaders. Two completely unrelated classes that both use synchronized(\"lock\") share the SAME lock object.",
+      "synchronized methods are NOT inherited by subclasses. If a subclass overrides a synchronized method without adding synchronized, the override is not synchronized — calls to the override are not mutually exclusive.",
+      "static synchronized methods and instance synchronized methods do NOT block each other — they use different locks (Class object vs instance). Two threads can run one of each concurrently on the same instance.",
+      "synchronized prevents reordering across the lock boundary (on acquire and release), but does NOT prevent reordering of code INSIDE the synchronized block. For field visibility to be correct, the variable must be volatile OR accessed only while holding the lock consistently.",
+      "The JVM's biased locking (pre-Java 15) could make uncontended synchronized essentially free. This optimization was removed in Java 17 — lightly-contested synchronized now has more overhead than before.",
+    ],
     gotcha:
       "Always use while (condition) wait(), never if (condition) wait(). Spurious wakeups mean notifyAll() can wake a thread even when the condition hasn't changed.",
     takeaway:
@@ -624,6 +1011,26 @@ low.setPriority(Thread.MIN_PRIORITY);   // 1
     }
 }`,
       },
+    ],
+    bestPractices: [
+      "Use volatile ONLY for simple flags or single-variable state — not for compound operations that need atomicity",
+      "Pair volatile references with immutable objects — a volatile reference to an immutable object is fully thread-safe",
+      "Document every volatile field with a comment explaining why — volatile usage is non-obvious to readers",
+      "Never use volatile as a substitute for synchronized on compound operations — it only guarantees visibility, not atomicity",
+      "For counters, use AtomicInteger/AtomicLong. For references with CAS semantics, use AtomicReference.",
+    ],
+    thumbRules: [
+      "Single boolean flag, one writer, many readers → volatile boolean",
+      "Counter modified by multiple threads → AtomicInteger, never volatile int",
+      "Reference to a newly created immutable object, safely published → volatile reference",
+      "Singleton lazy initialization → volatile + DCL, or Initialization-on-demand holder",
+      "64-bit value (long/double) shared between threads → volatile long or AtomicLong",
+    ],
+    hiddenTruths: [
+      "volatile writes/reads are NOT free. They flush CPU caches and prevent compiler optimizations. In tight inner loops accessing a volatile variable, performance can drop 5–10x compared to a non-volatile field.",
+      "Java's volatile is semantically STRONGER than C++'s volatile. Java volatile establishes a full happens-before relationship. C++ volatile only prevents compiler from caching the value — it gives no memory visibility guarantee across threads. Never assume they're equivalent.",
+      "volatile long and volatile double ARE atomic (read or write is one operation) — unlike non-volatile long/double on 32-bit JVMs which can be torn. This is one of the rare cases where volatile adds atomicity, not just visibility.",
+      "volatile prevents reordering ACROSS the volatile access, but NOT within the same thread before the write or after the read. Code between two volatile writes can still be reordered by the CPU.",
     ],
     gotcha:
       "volatile is not a drop-in replacement for synchronized. It ensures visibility but not atomicity. Use synchronized or Atomic* classes for read-modify-write operations.",
@@ -715,6 +1122,26 @@ low.setPriority(Thread.MIN_PRIORITY);   // 1
 }`,
       },
     ],
+    bestPractices: [
+      "Establish and DOCUMENT a global lock acquisition order — enforce it in code reviews. One violation anywhere in the codebase is enough to deadlock.",
+      "Prefer acquiring at most one lock at a time — design your objects so that one lock per operation is sufficient",
+      "Use tryLock(timeout, unit) for any code path where waiting long is possible — it breaks the hold-and-wait condition",
+      "Add thread dump analysis to your incident runbooks — jstack clearly labels deadlocks with the full chain",
+      "Prefer higher-level abstractions (ConcurrentHashMap, BlockingQueue, Executors) that manage their own internal locking",
+    ],
+    thumbRules: [
+      "Production JVM hangs with BLOCKED threads → take a thread dump immediately: jstack <pid>",
+      "Must acquire two locks? → sort them by identity hash (System.identityHashCode) or a stable constant for consistent ordering",
+      "Library code where lock order is unknown (3rd party) → use tryLock(timeout) with back-off and retry",
+      "Nested method calls that cross lock boundaries? → extract to avoid holding a lock while calling external code",
+    ],
+    hiddenTruths: [
+      "Java does NOT automatically detect or break deadlocks at runtime. The JVM has no deadlock-breaker — deadlocked threads sit blocked forever until a human takes a thread dump or kills the process.",
+      "Database deadlocks are different — most DBs (PostgreSQL, MySQL, SQL Server) detect and automatically break deadlocks by rolling back one victim transaction. Thread deadlocks in the JVM are permanently fatal without intervention.",
+      "Livelock is 'deadlock with motion' — threads are running, CPU is high, but no useful work is done. Harder to detect because CPU is pegged. Fix with randomized back-off to break symmetry.",
+      "A thread can deadlock with itself in rare cases — not via re-entrant locks (which are fine), but via a blocking call between two synchronized methods on different objects where the second locks back to the first.",
+      "Object.wait() inside a synchronized block that holds multiple locks is a deadlock trap: wait() releases only ONE lock (the one you called wait() on) — all other held locks stay locked.",
+    ],
     gotcha:
       "Thread dumps (jstack) show 'Found 1 deadlock' with the full chain of threads and locks. Run jstack on prod when threads stop making progress.",
     takeaway:
@@ -803,6 +1230,26 @@ map.putIfAbsent("key", 1);
 // BEST: computeIfAbsent — only calls the factory function if key is absent
 map.computeIfAbsent("key", k -> computeExpensiveValue(k));`,
       },
+    ],
+    bestPractices: [
+      "Mark every shared mutable field and reason about who writes, who reads, and whether they need synchronization",
+      "Use ConcurrentHashMap.computeIfAbsent() for check-then-create patterns — never containsKey() + put() under concurrency",
+      "Prefer immutable objects — they are inherently race-free. No synchronization needed for reads",
+      "Write multi-threaded tests that run many iterations with random scheduling (use Thread.yield() or Thread.sleep(1) at race-prone points) — races are timing-dependent and won't show in single-threaded tests",
+      "Use tools: Java's -ea (assertions), ThreadSanitizer, ErrorProne's thread safety annotations (@GuardedBy)",
+    ],
+    thumbRules: [
+      "Any shared variable with at least one writer → needs synchronized, volatile, or AtomicXxx",
+      "if (!map.containsKey(k)) map.put(k, v) → replace with map.putIfAbsent(k, v)",
+      "Lazy init without synchronization → safe only with Initialization-on-demand Holder or volatile + DCL",
+      "counter++ on a shared variable → AtomicInteger.incrementAndGet()",
+      "Object published to another thread after construction → volatile reference OR synchronize the publication",
+    ],
+    hiddenTruths: [
+      "Race conditions don't always produce wrong results on every run — they're timing-dependent. A race that fires 1 in 10,000 executions will pass all local tests and blow up in production on high-traffic days.",
+      "ConcurrentHashMap's individual operations (get, put, remove) are atomic, but compound operations are NOT: if (!map.containsKey(k)) map.put(k,v) is still a race. Always use the atomic compound methods: putIfAbsent, computeIfAbsent, compute, merge.",
+      "StringBuilder is NOT thread-safe. Shared StringBuilder used by multiple threads causes garbled strings. Use StringBuffer (synchronized) or collect per-thread and merge at the end.",
+      "The JVM JIT compiler can cache reads of non-volatile shared variables in CPU registers, making a fresh read completely invisible across threads — your 'correct looking' code may race indefinitely in optimized builds under high load.",
     ],
     gotcha:
       "ConcurrentHashMap makes individual operations thread-safe, but compound operations (containsKey + put) are still races unless you use the atomic methods like putIfAbsent, compute, or merge.",
@@ -925,6 +1372,26 @@ public class BoundedBuffer<T> {
     }
 }`,
       },
+    ],
+    bestPractices: [
+      "Always put lock.unlock() in a finally block — a single missing unlock leaves the lock held forever",
+      "Use private final lock objects — never expose your lock so external code can't interfere",
+      "Keep the lock scope as narrow as possible: only the exact code that needs mutual exclusion inside the lock",
+      "Avoid holding locks during I/O, network calls, or any long-running operations — other threads starve",
+      "For simple cases, prefer synchronized over ReentrantLock — it's shorter and the JVM can optimize it",
+    ],
+    thumbRules: [
+      "Simple mutual exclusion, no fancy features needed → synchronized (no unlock-in-finally mistake possible)",
+      "Need tryLock(), timeout, or interruptible lock acquisition → ReentrantLock",
+      "Need multiple wait conditions on one lock → ReentrantLock + newCondition()",
+      "Need read concurrency (many readers, one writer) → ReadWriteLock or StampedLock",
+      "Fine-grained per-entry locking on a map → ConcurrentHashMap (handles its own sharded locking)",
+    ],
+    hiddenTruths: [
+      "Lock granularity is a trade-off: one coarse lock is simple but a bottleneck. Fine-grained locks improve throughput but multiply deadlock risk — each additional lock is another edge in the deadlock graph.",
+      "The JVM may perform lock elision: if a lock is provably not visible to other threads (e.g. a local variable), the JIT removes the locking overhead entirely. Writing 'unnecessary' synchronized code in local scope doesn't cost you.",
+      "ReentrantLock is re-entrant but you must call unlock() for EVERY lock() call — even in re-entrant code. A lock acquired twice needs two unlocks. Forgetting one is a permanent hold.",
+      "Object.notify() releases the lock momentarily to wake a thread, then the woken thread must re-acquire the lock before continuing. The notifier can acquire the lock again before the woken thread does — woken threads don't jump the queue.",
     ],
     gotcha:
       "Forgetting `unlock()` in a finally block with ReentrantLock leaves the lock permanently held — every subsequent thread blocks forever. Unlike `synchronized`, there is no automatic release.",
@@ -1052,6 +1519,25 @@ class Cache {
 }`,
       },
     ],
+    bestPractices: [
+      "Default to synchronized or ReentrantLock. Upgrade to ReadWriteLock only when you have measured read-heavy contention",
+      "StampedLock's optimistic read is the fastest option for read-heavy data, but requires validating the stamp — never skip the validate() call",
+      "Fair locks: use only when you have evidence of thread starvation — they're 2-5x slower than unfair locks",
+      "Document every non-trivial lock type choice — the rationale for choosing StampedLock vs ReadWriteLock vs synchronized is not obvious",
+    ],
+    thumbRules: [
+      "Mostly reads, occasional writes → ReadWriteLock or StampedLock",
+      "Very short critical sections, low contention → CAS (AtomicXxx) — avoids OS-level blocking entirely",
+      "Long hold times → blocking lock (ReentrantLock) — spin lock wastes CPU while waiting long",
+      "Starvation is a measured problem → fair ReentrantLock(true)",
+      "Re-entrant by default? YES for synchronized and ReentrantLock. NO for StampedLock (re-entering deadlocks)",
+    ],
+    hiddenTruths: [
+      "StampedLock is NOT re-entrant. If a thread holds a StampedLock write lock and tries to acquire it again, it deadlocks itself. Unlike ReentrantLock, this is a fatal mistake.",
+      "ReentrantReadWriteLock does NOT support lock UPGRADE (read → write). You must release the read lock first, then acquire write. Any attempt to upgrade directly causes deadlock — all readers wait for each other to release.",
+      "Optimistic reading with StampedLock is NOT free — the validate() call adds a memory barrier. It's still faster than a full read lock for very short reads, but the benefit shrinks for longer read operations.",
+      "CAS spin locks can cause cache line thrashing: if many threads CAS the same memory location, the cache line bounces between CPUs. AtomicInteger.incrementAndGet() on a shared counter under high contention can be slower than synchronized.",
+    ],
     gotcha:
       "Lock upgrade (read lock → write lock) is NOT allowed in ReentrantReadWriteLock — it always deadlocks because each reader is waiting for the other to release. Always release the read lock first, then acquire write.",
     takeaway:
@@ -1170,6 +1656,26 @@ class NoPinning {
 }`,
       },
     ],
+    bestPractices: [
+      "Do NOT pool virtual threads — creating them is cheap (~few KB). Executors.newVirtualThreadPerTaskExecutor() creates a fresh VT per task by design",
+      "Audit your codebase for synchronized blocks in hot paths before migrating to virtual threads — each one is a potential pinning point",
+      "Use ReentrantLock (not synchronized) in code paths that block on I/O — allows the virtual thread to unmount from its carrier",
+      "Use -Djdk.tracePinnedThreads=full to discover pinning events in your application before going to production",
+      "Don't mix virtual thread executors with code that uses ThreadLocal heavily — stale ThreadLocal values cause subtle bugs (clean up in finally blocks)",
+    ],
+    thumbRules: [
+      "I/O-bound service on Java 21 → Executors.newVirtualThreadPerTaskExecutor() or spring.threads.virtual.enabled=true",
+      "CPU-bound task → platform thread pool (virtual threads won't help, may hurt)",
+      "Library uses synchronized internally (many JDBC drivers, some frameworks) → virtual threads will pin on those paths — benchmark before deploying",
+      "Want to check if current thread is virtual → Thread.currentThread().isVirtual()",
+      "Need structured parent-child cancellation → StructuredTaskScope (Java 21 preview, 23 stable)",
+    ],
+    hiddenTruths: [
+      "Virtual threads do NOT eliminate the need for synchronized or locks on shared mutable state. They are a concurrency scaling solution, not a thread-safety solution. You still need proper synchronization.",
+      "ThreadLocal values ARE inherited by virtual threads by default. This means ThreadLocal-based context propagation (MDC, Spring SecurityContext, HTTP request scope) can leak from one request's virtual thread to another if not cleaned up.",
+      "Virtual threads perform slightly WORSE than platform threads for pure CPU work — the mounting/unmounting mechanism adds overhead. Only use them where blocking I/O is the bottleneck.",
+      "The JVM carrier thread pool size defaults to Runtime.availableProcessors() and can be configured via -Djdk.virtualThreadScheduler.parallelism=N. Too few carriers bottleneck CPU-heavy virtual thread work.",
+    ],
     gotcha:
       "Virtual threads are pinned (cannot unmount) inside `synchronized` blocks. If your pinned code then blocks on I/O or sleep, the carrier thread is fully occupied — you lose all benefits. Migrate hot `synchronized` blocks to `ReentrantLock` when using virtual threads.",
     takeaway:
@@ -1250,15 +1756,994 @@ void fairWork() {
 // because the JVM can't let the currently-running thread 'barge' the queue`,
       },
     ],
+    bestPractices: [
+      "For livelock: always add jitter (random delay) to retry/back-off logic — deterministic back-off loops are livelock-prone",
+      "For starvation: measure first before reaching for fair locks — fair locks have real throughput cost",
+      "Design tasks to have similar execution times — wildly different task lengths cause starvation of long-running tasks in some schedulers",
+      "In thread pools: use separate pools for long-running tasks vs short-running tasks to prevent long tasks from starving short ones",
+    ],
+    thumbRules: [
+      "CPU high, no output, threads in RUNNABLE → livelock — add randomized back-off",
+      "Some threads never progress while others complete rapidly → starvation — check lock fairness or task queue design",
+      "Retry logic in multiple threads → always use exponential backoff with jitter, never fixed-interval retry",
+      "Need fairness guarantee → ReentrantLock(true), but only if starvation is a measured problem, not a theoretical one",
+    ],
+    hiddenTruths: [
+      "Livelock is harder to detect than deadlock because CPU is 100% and threads show RUNNABLE in thread dumps — it looks like the system is 'busy'. Deadlock is easier: threads are BLOCKED and jstack says 'Found N deadlocks'.",
+      "Starvation can happen even with synchronized — the JVM makes no fairness guarantee with synchronized. A thread that just released a lock can immediately re-acquire it (barging), repeatedly starving others.",
+      "Exponential backoff without jitter (randomness) across multiple threads STILL produces livelock — all threads back off to the same interval and retry simultaneously. The jitter is mandatory.",
+      "Thread priority (setPriority) is NOT a reliable starvation fix on modern JVMs — the OS may ignore it entirely. Fair locks are the only reliable mechanism.",
+    ],
     gotcha:
       "Fair locks (ReentrantLock(true)) prevent starvation but reduce throughput — FIFO ordering means threads wake one at a time. Only use when fairness is a hard requirement.",
     takeaway:
       "Livelock → add randomness to break symmetry. Starvation → use fair queuing or restructure so long-running tasks don't hog resources.",
   },
+
+  {
+    id: "false-sharing",
+    title: "False Sharing & Cache Line Padding",
+    category: "Performance",
+    tags: ["false sharing", "cache line", "MESI protocol", "@Contended", "padding", "CPU cache"],
+    definition:
+      "False sharing occurs when two threads write to different variables that happen to share the same CPU cache line (~64 bytes). Even though the variables are logically unrelated, the cache coherency protocol (MESI) forces CPUs to invalidate and reload the entire cache line on every write — causing massive cache thrashing between cores and making parallel code slower than sequential.",
+    whenToUse: [
+      "Diagnosing parallel code that is slower than expected despite correct synchronization",
+      "Designing high-performance data structures where per-thread or per-core counters are used",
+      "Optimizing hot paths in lock-free algorithms where multiple threads update adjacent fields",
+    ],
+    howToThink: [
+      "CPU cache lines are typically 64 bytes. Any two fields within 64 bytes of each other share a cache line.",
+      "When Thread A writes field X and Thread B writes field Y (adjacent in memory), CPU A must invalidate CPU B's cache line (even though the data doesn't conflict logically).",
+      "Fix: add padding between the two fields so they end up on different cache lines.",
+      "Java 8+: @jdk.internal.vm.annotation.Contended pads the annotated field to its own cache line. Requires -XX:-RestrictContended JVM flag.",
+      "java.util.concurrent.atomic.LongAdder uses internal cell padding to avoid false sharing — that's why it outperforms AtomicLong under high contention.",
+    ],
+    codeExamples: [
+      {
+        title: "The Problem — Two Threads on Adjacent Fields",
+        description: "Thread A increments a.value and Thread B increments b.value. Because a and b share a cache line, every write by one thread invalidates the other thread's cache entry — performance collapses under contention.",
+        code: `// BAD: adjacent fields likely share a 64-byte cache line
+class SharedCounters {
+    long valueA = 0;   // offset ~16 bytes from object header
+    long valueB = 0;   // offset ~24 bytes — same cache line as valueA!
+}
+
+// Thread A: ++obj.valueA — writes to cache line X on CPU 0
+// Thread B: ++obj.valueB — also writes cache line X on CPU 1
+// Result: CPUs 0 and 1 ping-pong ownership of the same cache line
+//         → can be 10-100x slower than single-threaded for hot counters`,
+      },
+      {
+        title: "Fix 1 — Manual Padding (Pre-Java 8)",
+        description: "Add padding long fields between the two counters so they end up on separate cache lines. 7 longs × 8 bytes = 56 bytes padding + 8 bytes for the actual value = 64 bytes (one full cache line).",
+        code: `// Good: manually pad to separate cache lines
+class PaddedCounters {
+    // Cache line 1: 8B value + 7×8B padding = 64B
+    long valueA = 0;
+    long _p1, _p2, _p3, _p4, _p5, _p6, _p7; // padding fills the rest of the cache line
+
+    // Cache line 2: 8B value + 7×8B padding = 64B
+    long valueB = 0;
+    long _q1, _q2, _q3, _q4, _q5, _q6, _q7;
+}
+// Thread A and B now update different cache lines — no thrashing`,
+      },
+      {
+        title: "Fix 2 — @Contended Annotation (Java 8+)",
+        description: "@jdk.internal.vm.annotation.Contended tells the JVM to pad the field to its own cache line. Cleaner than manual padding. Requires -XX:-RestrictContended JVM flag to take effect.",
+        code: `import jdk.internal.vm.annotation.Contended;
+
+class AnnotatedCounters {
+    @Contended
+    long valueA = 0;   // JVM pads this to its own 64-byte cache line
+
+    @Contended
+    long valueB = 0;   // Also isolated on its own cache line
+}
+// Start JVM with: -XX:-RestrictContended
+// Used internally by: LongAdder, ConcurrentHashMap, Thread`,
+      },
+      {
+        title: "LongAdder — The JDK's False Sharing Solution",
+        description: "LongAdder distributes counting across multiple padded 'Cell' slots (one per CPU). Each thread writes to its own CPU-local cell. The total is summed lazily. Under high contention, it massively outperforms AtomicLong.",
+        code: `import java.util.concurrent.atomic.*;
+
+// AtomicLong: single CAS on one location — cache line bounces between CPUs under contention
+AtomicLong atomicCounter = new AtomicLong(0);
+
+// LongAdder: distributes writes across CPU-local padded cells
+LongAdder adderCounter = new LongAdder();
+
+// LongAdder wins under HIGH CONTENTION:
+// Scenario: 8 threads each doing 10M increments
+// AtomicLong: ~3.5 seconds (cache line ping-pong)
+// LongAdder:  ~0.4 seconds (per-CPU local cells)
+
+// Usage:
+adderCounter.increment();              // fast — writes to thread-local cell
+long total = adderCounter.sum();       // sum all cells — slightly slower read
+long total2 = adderCounter.sumThenReset(); // sum and reset atomically
+
+// Rule: prefer LongAdder for high-contention counters (metrics, event counts)
+//       prefer AtomicLong when you need precise CAS operations (unique IDs)`,
+      },
+    ],
+    bestPractices: [
+      "Use LongAdder (not AtomicLong) for high-contention counters like request counts, event metrics, throughput stats",
+      "Keep per-thread data in ThreadLocal — eliminates false sharing by design (each thread has its own copy)",
+      "In custom data structures with per-thread or per-core fields, pad to 64-byte boundaries using @Contended or manual padding",
+      "Profile first with async-profiler or JFR before adding padding — false sharing is only relevant in hot loops with >2 threads",
+    ],
+    thumbRules: [
+      "Parallel performance < sequential performance despite no contention → suspect false sharing — profile with JFR or async-profiler",
+      "Multiple counters updated by different threads in the same class → pad them or use LongAdder",
+      "Cache line size is 64 bytes on x86/ARM — 8 longs exactly fill one cache line",
+      "Fields in the same object are often adjacent in memory → adjacent mutable fields shared across threads = false sharing risk",
+    ],
+    hiddenTruths: [
+      "False sharing makes correct code dramatically slower WITHOUT any data corruption, deadlock, or race condition. It is a performance bug, not a correctness bug — and it's invisible in tests unless you benchmark under realistic concurrency.",
+      "java.util.concurrent.atomic.LongAdder, ConcurrentHashMap cells, and Thread fields (like the thread ID) use @Contended internally — this is why these JDK classes require -XX:-RestrictContended when used in non-bootstrap code.",
+      "The JVM object layout is not predictable: the JIT can reorder fields. The @Contended annotation is the ONLY reliable way to guarantee a field is on its own cache line — manual padding can be reordered away by the JVM.",
+      "False sharing between different objects (not fields of the same object) also occurs when objects are allocated adjacently in memory. LongAdder's 'Cell' array objects are also padded for this reason.",
+    ],
+    gotcha:
+      "You can't see false sharing in a thread dump or profiler by looking at lock wait times — there are no locks involved. Use hardware performance counters (via async-profiler's --perf mode or JFR cache miss events) to detect it.",
+    takeaway:
+      "When parallel code is slower than expected: check for false sharing. Use LongAdder for counters, ThreadLocal for per-thread state, and @Contended for custom hot fields. Match the solution to the contention level — padding and LongAdder add memory overhead, only justified when the bottleneck is proven.",
+  },
+
+  {
+    id: "amdahls-law",
+    title: "Amdahl's Law & Scalability Limits",
+    category: "Performance",
+    tags: ["Amdahl's Law", "parallelism", "scalability", "speedup", "serial fraction", "Gustafson's Law"],
+    definition:
+      "Amdahl's Law states that the maximum speedup from parallelism is strictly limited by the serial (non-parallelizable) fraction of the program. If 10% of your program must run serially, you can never achieve more than 10x speedup regardless of how many threads you add. This is the fundamental upper bound of parallel programming.",
+    whenToUse: [
+      "Deciding whether parallelism is worth pursuing for a given problem",
+      "Setting realistic expectations for the speedup a thread pool will deliver",
+      "Identifying the serial bottleneck to optimize before adding more threads",
+    ],
+    howToThink: [
+      "Speedup formula: S(n) = 1 / (p_serial + (p_parallel / n)) where p_serial = serial fraction, n = number of processors.",
+      "If 50% is serial: max speedup is 2x (at infinite cores). If 5% is serial: max speedup is 20x.",
+      "Serial fractions include: synchronization overhead, I/O, lock contention, startup, queue management, and memory allocation.",
+      "Every lock acquisition, every synchronized section, every shared counter is a serial fraction — they add up.",
+      "Gustafson's Law (less pessimistic): as problem SIZE grows with n cores, serial fraction becomes relatively smaller. Parallel programs can scale better than Amdahl predicts when problem size grows.",
+    ],
+    codeExamples: [
+      {
+        title: "Amdahl's Law — Calculating Maximum Speedup",
+        description: "The formula directly computes the theoretical maximum speedup given a serial fraction. This tells you the ceiling BEFORE you write a single parallel line.",
+        code: `// Amdahl's Law: S(n) = 1 / (p_serial + (p_parallel / n))
+// p_serial + p_parallel = 1.0
+
+static double amdahlSpeedup(double serialFraction, int numCores) {
+    double parallelFraction = 1.0 - serialFraction;
+    return 1.0 / (serialFraction + parallelFraction / numCores);
+}
+
+// Scenarios — serialFraction=0.10 (10% serial):
+// 1 core:       1.0x
+// 2 cores:      1.82x
+// 4 cores:      3.08x
+// 8 cores:      4.71x
+// 16 cores:     6.40x
+// 100 cores:    9.17x
+// ∞ cores:     10.0x  ← THE HARD CEILING
+
+// serialFraction=0.01 (1% serial):
+// 16 cores:    14.4x
+// 64 cores:    39x
+// ∞ cores:    100x  ← now we have room to scale
+
+// Key insight: halving the serial fraction doubles the theoretical max speedup
+// Optimize the serial parts first — not the parallel parts`,
+      },
+      {
+        title: "Real-World Serial Fractions",
+        description: "In practice, serial fractions come from synchronization, I/O, memory allocation, and coordination. Measuring them is the first step to knowing whether more threads will help.",
+        code: `import java.util.concurrent.*;
+import java.util.List;
+import java.util.ArrayList;
+
+// Measuring serial vs parallel fraction with timestamps
+public class ParallelTaskProfile {
+    public static void main(String[] args) throws Exception {
+        int N = 1_000_000;
+        int THREADS = Runtime.getRuntime().availableProcessors();
+
+        // --- Serial portion: setup, partitioning, result merging ---
+        long serialStart = System.nanoTime();
+        List<long[]> partitions = partition(N, THREADS);      // serial
+        long serialSetupNs = System.nanoTime() - serialStart;
+
+        // --- Parallel portion: actual computation ---
+        ExecutorService pool = Executors.newFixedThreadPool(THREADS);
+        List<Future<Long>> futures = new ArrayList<>();
+
+        long parallelStart = System.nanoTime();
+        for (long[] part : partitions) {
+            futures.add(pool.submit(() -> sumPart(part)));
+        }
+
+        long total = 0;
+        for (Future<Long> f : futures) total += f.get();   // also serial (merge)
+        long parallelNs = System.nanoTime() - parallelStart;
+
+        long mergeStart = System.nanoTime();
+        processTotal(total);                                  // serial
+        long mergeNs = System.nanoTime() - mergeStart;
+
+        long totalTime = serialSetupNs + parallelNs + mergeNs;
+        double serialFraction = (double)(serialSetupNs + mergeNs) / totalTime;
+        System.out.printf("Serial fraction: %.1f%% → max speedup: %.1fx%n",
+            serialFraction * 100, 1.0 / serialFraction);
+
+        pool.shutdown();
+    }
+    static List<long[]> partition(int n, int parts) { /* ... */ return null; }
+    static long sumPart(long[] part) { long s=0; for (long v : part) s+=v; return s; }
+    static void processTotal(long t) {}
+}`,
+      },
+    ],
+    bestPractices: [
+      "Measure the serial fraction BEFORE adding more threads — if 20% is serial, you're wasting time optimizing the parallel 80%",
+      "Reduce synchronization points (lock acquisitions, shared counters, barriers) — each one adds to the serial fraction",
+      "Batch results before merging — merging one result per task is O(N) serial. Batch then merge in parallel",
+      "Use lock-free algorithms (LongAdder, ConcurrentHashMap) for global counters — they reduce the serial fraction from O(N) to amortized O(1)",
+    ],
+    thumbRules: [
+      "Adding more threads than Amdahl's ceiling → no more speedup, just more contention and memory usage",
+      "Serial fraction > 10% → doubling cores gives < 1.7x speedup — focus on reducing serial work first",
+      "Serial fraction < 1% → parallelism scales well beyond 64 cores — worth investing in parallel algorithm",
+      "Lock contention under load → the contended section is your serial fraction — measure with JFR lock profiling",
+    ],
+    hiddenTruths: [
+      "Amdahl's Law is an OPTIMISTIC bound — it assumes zero overhead for thread creation, scheduling, synchronization, and memory. Real parallel speedup is always worse than Amdahl's prediction.",
+      "The serial fraction is NOT constant — synchronization overhead GROWS with the number of threads. Adding threads can make the serial fraction larger, causing a speedup curve that peaks and then declines.",
+      "Most real workloads have a serial fraction of 5–20%. This means the practical speedup ceiling is 5–20x regardless of hardware. Buying a 64-core machine does not give 64x throughput for a typical application.",
+      "Gustafson's Law is more optimistic: if you scale the problem SIZE with the number of cores (like batch processing more data), the serial fraction stays constant in absolute time, allowing near-linear scaling.",
+    ],
+    gotcha:
+      "Adding threads beyond the Amdahl ceiling doesn't just give no benefit — it actively hurts performance through increased lock contention, context switching, and cache pressure. More threads is not always better.",
+    takeaway:
+      "Before adding more threads: identify and minimize the serial fraction. Every synchronized block, shared counter, and coordination point is serial. The best parallel optimization is often making the serial portion faster, not adding more threads.",
+  },
+
+  // ─────────────────── SYNCHRONIZATION ─────────────────────────────────────
+  {
+    id: "safe-publication",
+    title: "Safe Publication",
+    category: "Synchronization",
+    tags: ["publication", "visibility", "happens-before", "final", "volatile"],
+    definition:
+      "Safe publication means making an object reference visible to other threads in a way that guarantees they see the object's fully-initialized state. An object is 'safely published' when all its fields are visible to any thread that reads the reference — not just the reference itself.",
+    whenToUse: [
+      "Sharing objects between threads (even immutable ones need safe publication)",
+      "Lazy initialization of shared resources",
+      "Publishing results from background threads to the main thread",
+    ],
+    codeExamples: [
+      {
+        title: "Unsafe vs Safe Publication",
+        description: "Writing a reference to a non-volatile field is NOT a safe publication mechanism. Another thread can see the reference without seeing the fully-constructed object. Use volatile, final fields, synchronized, or AtomicReference.",
+        code: `// UNSAFE: non-volatile reference — reader may see partial construction
+public class Holder {
+    private Resource resource; // non-volatile
+
+    public void initialize() {
+        resource = new Resource(); // NOT safely published
+    }
+    public Resource get() {
+        return resource; // reader may see null OR a partially-constructed Resource
+    }
+}
+
+// SAFE OPTION 1: volatile — establishes happens-before
+public class HolderSafe {
+    private volatile Resource resource;
+
+    public void initialize() {
+        resource = new Resource(); // volatile write = safe publication
+    }
+    public Resource get() {
+        return resource; // volatile read sees fully-constructed Resource
+    }
+}
+
+// SAFE OPTION 2: final fields — published safely via constructor
+public class ImmutableConfig {
+    private final String host;    // final: safely published via constructor
+    private final int    port;
+
+    public ImmutableConfig(String host, int port) {
+        this.host = host;
+        this.port = port;
+    }
+}
+
+// SAFE OPTION 3: synchronized (expensive but always correct)
+public class HolderSync {
+    private Resource resource;
+    public synchronized void initialize() { resource = new Resource(); }
+    public synchronized Resource get()    { return resource; }
+}
+
+// SAFE OPTION 4: AtomicReference
+AtomicReference<Resource> ref = new AtomicReference<>();
+ref.set(new Resource()); // safe publication`,
+      },
+      {
+        title: "Static Initializer — Free Safe Publication",
+        description: "The JVM guarantees that static initializers run under class-loading synchronization. Any object assigned during static init is safely published to all threads that access the class.",
+        code: `// JVM guarantees safe publication of static fields initialized at declaration
+public class Config {
+    // Safely published — static initializer runs under JVM class-loading lock
+    public static final Config INSTANCE = new Config();
+
+    private final String host;
+    private final int    port;
+
+    private Config() {
+        this.host = System.getProperty("app.host", "localhost");
+        this.port = Integer.parseInt(System.getProperty("app.port", "8080"));
+    }
+}
+
+// Any thread that accesses Config.INSTANCE sees the fully-initialized object
+String host = Config.INSTANCE.host; // always safe`,
+      },
+    ],
+    gotcha:
+      "Even an IMMUTABLE object needs safe publication. If you write the reference to a non-volatile field and another thread reads it, it may see null or a stale reference — even if the object's internal state is correct once seen.",
+    takeaway:
+      "The four safe publication mechanisms are: (1) static initializer, (2) volatile field, (3) final field initialized in constructor, (4) synchronized block. Non-volatile, non-final fields are NOT safe publication channels.",
+    bestPractices: [
+      "Prefer immutable objects + static final fields for the simplest safe publication",
+      "Use volatile for lazily-initialized singleton references (without DCL overhead)",
+      "Use AtomicReference.set() for atomically replacing a published object",
+      "Never rely on 'it works in practice' — unsafe publication bugs are timing-dependent and disappear under low load",
+    ],
+    thumbRules: [
+      "Published once, never changed → static final (free safe publication)",
+      "Published lazily, read many times → volatile reference to immutable object",
+      "Need atomic compare-and-publish → AtomicReference.compareAndSet()",
+      "Shared in synchronized context → synchronized handles publication implicitly",
+    ],
+    hiddenTruths: [
+      "The Java Memory Model does NOT guarantee that a thread reading a non-volatile reference sees the most recently written value. On multicore hardware, each core has its own cache. Without a memory barrier (volatile, synchronized, final, atomic), the reader's core may have a stale value.",
+      "final fields have a special JMM guarantee: a thread that obtains a reference to an object via ANY mechanism (not just safe publication channels) is guaranteed to see the final fields' values as set in the constructor — as long as the constructor doesn't leak 'this'.",
+      "Publishing via a data race (non-volatile write + non-synchronized read) is called an 'improper publication'. The JVM is allowed to reorder the object's field writes relative to the reference write — so a reader may see the reference but find zero-initialized fields.",
+    ],
+  },
+
+  {
+    id: "immutability",
+    title: "Immutability & Effective Immutability",
+    category: "Synchronization",
+    tags: ["immutable", "final", "effective immutability", "thread-safe"],
+    definition:
+      "An immutable object cannot be modified after construction — all fields are final and all referenced objects are also immutable. Immutable objects are inherently thread-safe: no synchronization is needed. Effectively immutable objects are mutable but are never modified after safe publication.",
+    whenToUse: [
+      "Shared data that is set once (configuration, lookup tables, constants)",
+      "Value objects passed between threads (DTOs, events, messages)",
+      "Reducing synchronization overhead by eliminating shared mutable state",
+    ],
+    codeExamples: [
+      {
+        title: "Truly Immutable Class",
+        description: "An immutable class: all fields final, class is final (no subclassing), no setters, defensive copies of mutable fields in constructor and getters.",
+        code: `// Fully immutable: safe to share across threads without synchronization
+@Immutable
+public final class ImmutablePoint {
+    private final int x;
+    private final int y;
+
+    public ImmutablePoint(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    public int getX() { return x; }
+    public int getY() { return y; }
+
+    public ImmutablePoint translate(int dx, int dy) {
+        return new ImmutablePoint(x + dx, y + dy); // returns NEW object — this unchanged
+    }
+}
+
+// Immutable class with mutable field — defensive copy required
+public final class ImmutablePeriod {
+    private final Date start; // Date is mutable — must copy
+    private final Date end;
+
+    public ImmutablePeriod(Date start, Date end) {
+        this.start = new Date(start.getTime()); // defensive copy in constructor
+        this.end   = new Date(end.getTime());
+    }
+
+    public Date getStart() { return new Date(start.getTime()); } // defensive copy in getter
+    public Date getEnd()   { return new Date(end.getTime()); }
+}`,
+      },
+      {
+        title: "Effectively Immutable — Publish Once, Never Modify",
+        description: "An effectively immutable object is mutable by design but treated as read-only after safe publication. If all threads only read it after publication, no synchronization is needed.",
+        code: `// Effectively immutable: mutable HashMap, but never modified after construction
+public class Lookup {
+    private static volatile Map<String, Integer> CODES; // volatile for safe publication
+
+    public static void initialize(Map<String, Integer> data) {
+        Map<String, Integer> copy = new HashMap<>(data); // defensive copy
+        // Nobody modifies 'copy' after this point — effectively immutable
+        CODES = Collections.unmodifiableMap(copy); // safe publication via volatile write
+    }
+
+    public static Integer getCode(String key) {
+        return CODES.get(key); // only reads — no synchronization needed
+    }
+}
+
+// Using record (Java 16+) for immutable data carriers
+public record UserEvent(long userId, String action, Instant timestamp) {
+    // All fields are implicitly final; compact constructor can add validation
+    public UserEvent {
+        Objects.requireNonNull(action, "action required");
+    }
+}`,
+      },
+    ],
+    gotcha:
+      "Wrapping in Collections.unmodifiableMap does NOT make the map immutable — it only prevents modifications through THAT wrapper. If the underlying map is modified directly, all readers see the change. Use a true immutable copy or Map.copyOf() (Java 10+).",
+    takeaway:
+      "Design data objects as immutable by default. Every mutable field is a potential race condition. Immutable objects need no locking, can be freely shared, and simplify reasoning about correctness.",
+    bestPractices: [
+      "Declare all fields final unless you have a specific reason to mutate them",
+      "Make the class final to prevent subclasses from introducing mutability",
+      "Defensively copy mutable inputs in the constructor and mutable outputs in getters",
+      "Use Map.copyOf() / List.copyOf() (Java 10+) or Collections.unmodifiableXxx() for collections",
+      "Use Java records for immutable data carriers — they enforce immutability by design",
+    ],
+    thumbRules: [
+      "Shared read-only data (config, lookup tables) → immutable class or record",
+      "Value objects passed between threads (events, messages) → immutable",
+      "HashMap after construction never changes → wrap in Collections.unmodifiableMap() and publish via volatile",
+      "All fields final + class final + no setters + defensive copies → truly immutable",
+    ],
+    hiddenTruths: [
+      "A class with ALL final fields is NOT necessarily immutable if any field references a mutable object (e.g., final List<String> names — the list can still be modified). True immutability requires the entire object graph to be immutable.",
+      "Collections.unmodifiableList() creates a VIEW of the original — not a copy. If the original list is modified, the 'unmodifiable' view reflects the change. Use List.copyOf() or new ArrayList<>(original) for a true independent copy.",
+      "Java records are NOT automatically deeply immutable. A record with a List<String> field has an immutable reference but the list contents can be mutated. Always defensive-copy collection fields in record compact constructors.",
+      "String is immutable but String.intern() returns a reference to a shared pool. Synchronizing on an interned string or a literal (synchronized (\"lock\")) is a severe anti-pattern — you share a lock with any code using the same literal.",
+    ],
+  },
+
+  {
+    id: "thread-safety-levels",
+    title: "Thread Safety Levels",
+    category: "Synchronization",
+    tags: ["thread-safe", "conditionally safe", "not safe", "annotation", "documentation"],
+    definition:
+      "Thread safety has multiple levels. A class may be: Immutable (safest), Unconditionally Thread-Safe, Conditionally Thread-Safe (with external locking), Not Thread-Safe, or Thread-Hostile (breaks even with locking). Knowing the level helps you apply the right synchronization strategy.",
+    whenToUse: [
+      "Documenting and designing classes that will be shared across threads",
+      "Evaluating whether a third-party class needs external synchronization",
+      "Deciding how to protect access to a shared object",
+    ],
+    codeExamples: [
+      {
+        title: "The Five Thread Safety Levels",
+        description: "Each level requires different handling when shared across threads. Always document which level your class belongs to.",
+        code: `// LEVEL 1: Immutable — no synchronization needed, ever
+@Immutable
+public final class RGB {
+    public final int r, g, b;
+    public RGB(int r, int g, int b) { this.r=r; this.g=g; this.b=b; }
+}
+
+// LEVEL 2: Unconditionally Thread-Safe — synchronized internally
+// Examples: ConcurrentHashMap, AtomicInteger, LinkedBlockingQueue, StringBuffer
+@ThreadSafe
+public class SafeCounter {
+    private final AtomicInteger count = new AtomicInteger(0);
+    public int increment() { return count.incrementAndGet(); } // thread-safe
+}
+
+// LEVEL 3: Conditionally Thread-Safe — some operations need external lock
+// Example: Collections.synchronizedList (iteration needs caller-side lock)
+List<String> syncList = Collections.synchronizedList(new ArrayList<>());
+// Single operations (add, remove, get) are thread-safe
+syncList.add("item"); // OK
+// Iteration is NOT — requires caller-side lock
+synchronized (syncList) { // external lock required for iteration
+    for (String s : syncList) { process(s); }
+}
+
+// LEVEL 4: Not Thread-Safe — wrap or avoid sharing across threads
+// Examples: HashMap, ArrayList, SimpleDateFormat, StringBuilder
+// Solution: use thread-local, or synchronize externally, or use concurrent alternative
+
+// LEVEL 5: Thread-Hostile — can't be made safe even with locking
+// Example: calling System.setOut() while another thread reads System.out
+// These are rare but exist in legacy code`,
+      },
+      {
+        title: "Identifying and Documenting Thread Safety",
+        description: "Use the @ThreadSafe, @NotThreadSafe, @Immutable annotations from jcip-annotations (Brian Goetz's JCIP) to document your design intent. Future maintainers (including you) will thank you.",
+        code: `import net.jcip.annotations.*;
+
+// Clearly documented — no guessing needed
+@ThreadSafe
+public class RequestCounter {
+    private final LongAdder count = new LongAdder();
+    public void increment() { count.increment(); }
+    public long get() { return count.sum(); }
+}
+
+@NotThreadSafe
+public class QueryBuilder {
+    private final StringBuilder sb = new StringBuilder();
+    public QueryBuilder where(String clause) { sb.append(" WHERE ").append(clause); return this; }
+    public String build() { return sb.toString(); }
+    // Designed for single-thread use — do not share across threads
+}
+
+@Immutable
+public record Money(BigDecimal amount, Currency currency) {
+    public Money add(Money other) {
+        if (!currency.equals(other.currency)) throw new IllegalArgumentException("Currency mismatch");
+        return new Money(amount.add(other.amount), currency);
+    }
+}`,
+      },
+    ],
+    gotcha:
+      "Collections.synchronizedXxx wrappers are Conditionally Thread-Safe — individual operations are atomic, but compound operations (check-then-act, iterate) require external synchronization. A very common source of bugs.",
+    takeaway:
+      "Know the thread safety level of every class you share. The levels from safest to most dangerous: Immutable → Unconditionally Thread-Safe → Conditionally Thread-Safe → Not Thread-Safe → Thread-Hostile.",
+    bestPractices: [
+      "Document thread safety level in the class Javadoc (or @ThreadSafe/@NotThreadSafe annotations)",
+      "Default to 'Not Thread-Safe' if unsure — explicit external sync is better than accidental unsafety",
+      "Never share 'Not Thread-Safe' objects across threads without wrapping (ThreadLocal, synchronize, or replace with concurrent alternative)",
+      "For conditional thread safety, document WHICH methods need external locking in the Javadoc",
+    ],
+    thumbRules: [
+      "HashMap / ArrayList → Not Thread-Safe → use ConcurrentHashMap / CopyOnWriteArrayList, or synchronize externally",
+      "StringBuilder → Not Thread-Safe → StringBuffer (synchronized) or avoid sharing",
+      "SimpleDateFormat → Not Thread-Safe → ThreadLocal<DateFormat> or DateTimeFormatter (immutable)",
+      "Collections.synchronizedList → Conditionally Thread-Safe → wrap iteration in synchronized(list)",
+      "AtomicInteger, ConcurrentHashMap → Unconditionally Thread-Safe → no external synchronization needed",
+    ],
+    hiddenTruths: [
+      "StringBuffer is @ThreadSafe (synchronized methods), but this doesn't make StringBuilder thread-safe. They are different classes. Most modern code prefers StringBuilder + proper confinement rather than StringBuffer.",
+      "AtomicReference is Unconditionally Thread-Safe for individual operations but Conditionally Thread-Safe for compound operations — get + conditional set is still a race unless you use compareAndSet().",
+      "java.util.Random is @ThreadSafe but is a bottleneck under high thread contention (all threads share one seed AtomicLong). Use ThreadLocalRandom for per-thread random numbers without contention.",
+      "An Unconditionally Thread-Safe class that calls back into client code (via a Runnable, Comparator, etc.) can lose its safety — the client callback might not be thread-safe, and calling it under the class's lock can cause deadlocks.",
+    ],
+  },
+
+  {
+    id: "double-checked-locking",
+    title: "Double-Checked Locking (DCL)",
+    category: "Synchronization",
+    tags: ["DCL", "singleton", "lazy init", "volatile", "initialization-on-demand"],
+    definition:
+      "Double-Checked Locking (DCL) is a pattern for lazy singleton initialization that avoids the cost of synchronization on every read. The classic broken version was a widespread Java anti-pattern until volatile was fixed in Java 5's JMM. The correct version requires volatile.",
+    whenToUse: [
+      "Lazy initialization of an expensive singleton (DB connection pool, config loader)",
+      "When the object is initialized once and read many thousands of times",
+      "When synchronized access on every read would be a measurable bottleneck",
+    ],
+    codeExamples: [
+      {
+        title: "Broken DCL (pre-Java 5 / without volatile)",
+        description: "The classic broken version was used everywhere before Java 5. The JMM allowed the JIT to reorder writes so that a thread could see the reference non-null but get a partially-constructed object.",
+        code: `// BROKEN — do NOT use this pattern
+public class BrokenSingleton {
+    private static BrokenSingleton instance; // NOT volatile — broken!
+
+    public static BrokenSingleton getInstance() {
+        if (instance == null) {           // Check 1: no lock
+            synchronized (BrokenSingleton.class) {
+                if (instance == null) {   // Check 2: under lock
+                    instance = new BrokenSingleton(); // DANGER: JIT can reorder
+                    // Steps in "new BrokenSingleton()":
+                    // 1. Allocate memory
+                    // 2. Write reference to 'instance' (reference is now non-null)
+                    // 3. Initialize the object (constructor runs)
+                    // JIT can reorder 2 and 3 — another thread may see non-null 'instance'
+                    // pointing to a partially-initialized object
+                }
+            }
+        }
+        return instance; // may return partially-constructed object!
+    }
+}`,
+      },
+      {
+        title: "Correct DCL with volatile (Java 5+)",
+        description: "volatile on the instance field adds a memory barrier after the constructor, preventing reordering. The write to instance is visible to all threads AFTER the object is fully constructed.",
+        code: `// CORRECT — volatile prevents constructor/reference-write reordering
+public class Singleton {
+    private static volatile Singleton instance; // volatile is the key
+
+    private Singleton() {
+        // expensive initialization
+    }
+
+    public static Singleton getInstance() {
+        if (instance == null) {              // Check 1: fast path (no lock)
+            synchronized (Singleton.class) {
+                if (instance == null) {      // Check 2: slow path (under lock)
+                    instance = new Singleton(); // safe: volatile prevents reorder
+                }
+            }
+        }
+        return instance;
+    }
+}`,
+      },
+      {
+        title: "Initialization-on-Demand Holder (Best Alternative)",
+        description: "The Initialization-on-Demand Holder idiom is simpler, cleaner, and faster than DCL. It exploits the JVM's class-loading guarantee: inner class is loaded only when first accessed, and the JVM's class loader is already synchronized.",
+        code: `// PREFERRED: no volatile, no explicit synchronization, lazy, thread-safe
+public class BestSingleton {
+    private BestSingleton() { /* expensive init */ }
+
+    // Inner class is loaded (and INSTANCE initialized) only on first call to getInstance()
+    // Class loading is inherently thread-safe — JVM guarantees it
+    private static class Holder {
+        static final BestSingleton INSTANCE = new BestSingleton();
+    }
+
+    public static BestSingleton getInstance() {
+        return Holder.INSTANCE; // triggers class load on first call
+    }
+}
+
+// Also acceptable: enum singleton (Effective Java Item 89)
+public enum EnumSingleton {
+    INSTANCE;
+
+    public void doWork() { ... }
+}
+// EnumSingleton.INSTANCE — lazy, thread-safe, serialization-safe`,
+      },
+    ],
+    gotcha:
+      "The Initialization-on-Demand Holder is almost always the better choice over DCL. It's simpler (no volatile), faster (no memory barrier on reads), and impossible to break. DCL is only needed if the class has expensive static initialization you want to avoid.",
+    takeaway:
+      "If you need a lazy singleton: prefer Initialization-on-Demand Holder > DCL with volatile > synchronized getInstance(). The enum singleton handles serialization correctly if that's a concern.",
+    bestPractices: [
+      "Prefer Initialization-on-Demand Holder over DCL for lazy singleton — simpler and zero lock overhead on reads",
+      "If using DCL, always declare the field volatile — non-volatile DCL is broken and has been deployed in production widely",
+      "Consider enum singleton when serialization safety is required (Effective Java Item 89)",
+      "If the singleton is initialized at class load anyway, skip lazy init — simple static final field is clearest",
+    ],
+    thumbRules: [
+      "Lazy singleton, loaded once → Initialization-on-Demand Holder (inner static class)",
+      "Must use DCL pattern → field MUST be volatile",
+      "Singleton needs to be serializable → enum singleton",
+      "Early init is fine → public static final INSTANCE = new Singleton()",
+    ],
+    hiddenTruths: [
+      "Broken (non-volatile) DCL was deployed in millions of Java programs before Java 5. It 'works' most of the time because the JIT doesn't always reorder. But under JIT optimization or on certain architectures, it fails non-deterministically — making it one of the hardest bugs to reproduce.",
+      "volatile adds a StoreStore barrier before the write and a LoadLoad barrier after the read. This prevents the JIT from reordering the constructor writes after the reference assignment. Without volatile, the CPU is allowed to make the reference visible before the object is fully initialized.",
+      "The Initialization-on-Demand Holder idiom works because Java's class loader guarantees that a class is initialized at most once, under an internal lock. The JVM's class-loading protocol is a safe publication mechanism — no external sync needed.",
+      "Enum singletons survive serialization correctly: Java's serialization mechanism guarantees that a deserialized enum constant is the same JVM instance as the original. A regular singleton class would create a second instance during deserialization unless readResolve() is implemented.",
+    ],
+  },
+
+  {
+    id: "thread-local-memory-leak",
+    title: "ThreadLocal Memory Leaks",
+    category: "Pitfalls",
+    tags: ["ThreadLocal", "memory leak", "thread pool", "ClassLoader leak"],
+    definition:
+      "ThreadLocal values are stored in the Thread object's threadLocals map. Thread-pool threads are never garbage collected — so any ThreadLocal value set without calling remove() lives for the lifetime of the JVM. In web containers (Tomcat, JBoss), this causes ClassLoader leaks that prevent application redeployment.",
+    whenToUse: [
+      "Diagnosing memory leaks in applications using ThreadLocal",
+      "Implementing request-scoped context in thread-pool environments (Servlet containers, Spring)",
+      "Understanding why hot-redeployment in Tomcat causes OutOfMemoryError",
+    ],
+    codeExamples: [
+      {
+        title: "The Memory Leak Pattern",
+        description: "Thread-pool threads live for the JVM lifetime. Every ThreadLocal.set() without a matching remove() in a finally block adds a permanent entry to the thread's local map.",
+        code: `// LEAK: ThreadLocal without remove() in a thread-pool context
+ExecutorService pool = Executors.newFixedThreadPool(10);
+
+// This ThreadLocal stores a 10MB object
+ThreadLocal<byte[]> cache = new ThreadLocal<>();
+
+// Each pool thread will hold a 10MB reference FOREVER after first access
+pool.execute(() -> {
+    cache.set(new byte[10 * 1024 * 1024]); // 10MB
+    doWork();
+    // No cache.remove() — the 10MB lives on the thread for JVM lifetime
+    // After 10 tasks on 10 threads: 100MB permanently held
+});
+
+// CORRECT: always remove in a finally block
+pool.execute(() -> {
+    cache.set(new byte[10 * 1024 * 1024]);
+    try {
+        doWork();
+    } finally {
+        cache.remove(); // ALWAYS — even on exception
+    }
+});`,
+      },
+      {
+        title: "ClassLoader Leak in Web Containers",
+        description: "The worst ThreadLocal leak: a pool thread (owned by Tomcat) holds a ThreadLocal value whose type was loaded by the webapp's ClassLoader. On redeployment, the old ClassLoader can't be GC'd — entire application classes stay in memory.",
+        code: `// In webapp code (ClassLoader = WebAppClassLoader):
+ThreadLocal<MyService> serviceHolder = new ThreadLocal<>();
+// MyService.class was loaded by WebAppClassLoader
+
+// When a request runs:
+serviceHolder.set(new MyService()); // sets it on Tomcat's thread-pool thread
+// On request end — if remove() is missed:
+// Tomcat's thread holds ThreadLocal → MyService → WebAppClassLoader → all webapp classes
+// On hot-redeploy: old WebAppClassLoader cannot be GC'd → PermGen/Metaspace OOM
+
+// FIX 1: Always remove in a Servlet filter's finally block
+public class CleanupFilter implements Filter {
+    public void doFilter(ServletRequest req, ServletResponse res, FilterChain chain)
+            throws IOException, ServletException {
+        try {
+            chain.doFilter(req, res);
+        } finally {
+            serviceHolder.remove(); // runs even if request throws
+        }
+    }
+}
+
+// FIX 2: Use Spring's RequestContextHolder — it cleans up automatically
+// FIX 3: Switch to ScopedValue (Java 21+) — immutable, no leaks possible`,
+      },
+    ],
+    gotcha:
+      "The leak happens even with small objects — the issue is the ClassLoader reference chain, not the object size. A single leaked ThreadLocal entry pointing to an object loaded by a webapp ClassLoader can prevent GC of the entire application.",
+    takeaway:
+      "ThreadLocal in thread-pool environments: ALWAYS remove() in a finally block. In web containers, use framework-provided request-scope abstractions (Spring's RequestContextHolder) that handle cleanup automatically.",
+    bestPractices: [
+      "In every code path that calls ThreadLocal.set(), pair it with remove() in a finally block",
+      "Use a Servlet Filter or interceptor as the single cleanup point for request-scoped ThreadLocals",
+      "Prefer ScopedValue (Java 21+) over ThreadLocal in virtual thread or scoped-execution contexts",
+      "Audit ThreadLocal usage with memory profiler heap dumps — look for thread-local entries on pool threads",
+      "Prefer Spring's RequestContextHolder or MDC (which handles cleanup) over raw ThreadLocal in web code",
+    ],
+    thumbRules: [
+      "ThreadLocal + thread pool → ALWAYS remove() in finally",
+      "ThreadLocal in Servlet code → use a Filter to guarantee cleanup after each request",
+      "Virtual threads + context → ScopedValue (Java 21+), not ThreadLocal",
+      "Memory leak suspect → heap dump → look for ThreadLocalMap$Entry references on pool threads",
+    ],
+    hiddenTruths: [
+      "ThreadLocal does NOT hold a strong reference to the thread — the thread holds a strong reference to the ThreadLocal VALUE via its threadLocals map. Even if the ThreadLocal variable itself goes out of scope, the value stays alive as long as the thread is alive.",
+      "ThreadLocalMap uses WeakReference for keys (the ThreadLocal instance) but a STRONG reference for values. When the ThreadLocal variable is GC'd, the key becomes null (phantom entry) but the value is still held — until the next ThreadLocal.set/get/remove triggers cleanup of stale entries.",
+      "Java web containers like Tomcat track ThreadLocal usage and emit warnings like 'The web application appears to have started a thread named [http-nio-8080-exec-1] but has failed to stop it'. This is Tomcat detecting that pool threads have ThreadLocal entries pointing to webapp classes.",
+      "ScopedValue (Java 21+) solves the leak problem by design: values are bound to a scope, not a thread. When the scope exits, the binding is automatically removed — no remove() required, no possibility of leaking.",
+    ],
+  },
+
+  {
+    id: "structured-concurrency",
+    title: "Structured Concurrency (Java 21+)",
+    category: "Modern Java",
+    tags: ["StructuredTaskScope", "Java 21", "virtual threads", "scoped", "fan-out"],
+    definition:
+      "Structured concurrency ensures that the lifetime of concurrent tasks is bounded by their enclosing scope — just as structured programming bounded control flow to blocks. If any subtask fails, all siblings are automatically cancelled when the scope exits. No subtask outlives its creator.",
+    whenToUse: [
+      "Fan-out patterns: call N services concurrently, need all results",
+      "Hedged requests: call N replicas, take the first to respond",
+      "Replacing manual Future management with automatic lifecycle control",
+    ],
+    codeExamples: [
+      {
+        title: "ShutdownOnFailure — Fan-Out (Need All Results)",
+        description: "Fork N tasks. If any fails, all siblings are cancelled. The scope.join() + throwIfFailed() pattern propagates the first failure to the caller with full stack trace.",
+        code: `import java.util.concurrent.StructuredTaskScope;
+
+record PageData(User user, List<Order> orders, List<Product> recs) {}
+
+PageData buildPage(long userId) throws Exception {
+    try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+        var userTask   = scope.fork(() -> userService.find(userId));
+        var ordersTask = scope.fork(() -> orderService.findByUser(userId));
+        var recsTask   = scope.fork(() -> recService.forUser(userId));
+
+        scope.join();          // wait for all tasks (or first failure)
+        scope.throwIfFailed(); // re-throw if any subtask failed
+
+        // All three succeeded — safe to call .get()
+        return new PageData(userTask.get(), ordersTask.get(), recsTask.get());
+    }
+    // Scope exit: all incomplete subtasks are cancelled and awaited
+    // No subtask can outlive this method
+}`,
+      },
+      {
+        title: "ShutdownOnSuccess — Hedged Requests (First Wins)",
+        description: "Fork N tasks. The first to SUCCEED cancels all siblings. Perfect for redundant service calls, geographic load balancing, or any 'race to first result' pattern.",
+        code: `String callFastest(List<String> endpoints) throws Exception {
+    try (var scope = new StructuredTaskScope.ShutdownOnSuccess<String>()) {
+        for (String endpoint : endpoints) {
+            scope.fork(() -> callEndpoint(endpoint)); // all start concurrently
+        }
+        scope.join(); // returns when first task succeeds
+        return scope.result(); // the winning result
+    }
+    // All losing tasks are automatically cancelled on scope exit
+}`,
+      },
+      {
+        title: "Observability: Thread Dumps Show Parent-Child Relationships",
+        description: "Unlike CompletableFuture chains, StructuredTaskScope forks show the call hierarchy in thread dumps. The parent scope is visible in the child thread's stack — making debugging massively easier.",
+        code: `// Thread dump with StructuredTaskScope:
+// "main" #1 prio=5
+//   at buildPage:12 — waiting in scope.join()
+//   "fork-0" #21 virtual
+//     at userService.find — child of buildPage scope
+//   "fork-1" #22 virtual
+//     at orderService.findByUser — child of buildPage scope
+//
+// vs CompletableFuture:
+// "ForkJoinPool.commonPool-worker-1" #21
+//   at lambda$buildPage$0 — no parent relationship visible
+//
+// The structured version tells you WHO started the task.
+// CompletableFuture does not.`,
+      },
+    ],
+    gotcha:
+      "StructuredTaskScope requires virtual threads (Java 21+). It was in preview in JDK 21 and JDK 22, and became stable (non-preview) API in JDK 25. Enable with --enable-preview in JDK 21-24.",
+    takeaway:
+      "Structured concurrency brings the same discipline to concurrent code that structured programming brought to control flow. Subtasks cannot outlive their scope, errors propagate naturally, and thread dumps show parent-child relationships.",
+    bestPractices: [
+      "Always use try-with-resources with StructuredTaskScope — the close() method ensures all forked tasks are cancelled",
+      "Prefer StructuredTaskScope over CompletableFuture.allOf() for fan-out — automatic cancellation on failure",
+      "Use ShutdownOnSuccess for hedged requests (geo-routing, redundant replicas)",
+      "Use ShutdownOnFailure for dependent fan-out (all services must succeed to build response)",
+    ],
+    thumbRules: [
+      "All N concurrent results needed → ShutdownOnFailure + scope.join() + throwIfFailed()",
+      "First successful result needed (hedged) → ShutdownOnSuccess + scope.join() + result()",
+      "Custom cancellation policy → extend StructuredTaskScope directly",
+      "Java 21 preview → --enable-preview; Java 25+ → no flag needed",
+    ],
+    hiddenTruths: [
+      "scope.fork() returns a StructuredTaskScope.Subtask<T>, not a Future<T>. Subtask.get() can only be called AFTER scope.join() — calling it before throws IllegalStateException.",
+      "If the scope's owner thread is interrupted during scope.join(), the scope shuts down all forked tasks and re-throws InterruptedException. The interrupt is not silently consumed.",
+      "StructuredTaskScope.close() (called by try-with-resources) blocks until all forked tasks complete. If scope.join() was called and completed, close() returns immediately. If join() wasn't called, close() cancels all pending tasks and waits.",
+      "ShutdownOnFailure's throwIfFailed() throws the FIRST exception encountered, wrapped in ExecutionException. The exceptions from other failed subtasks are added as suppressed exceptions — check them if you need the full failure picture.",
+    ],
+  },
+
+  {
+    id: "happens-before-deep",
+    title: "Happens-Before Deep Dive",
+    category: "Java Memory Model",
+    tags: ["JMM", "happens-before", "memory barrier", "visibility", "ordering"],
+    definition:
+      "The Java Memory Model (JMM) defines a happens-before relationship to specify when one thread's memory writes are guaranteed to be visible to another thread's reads. If action A happens-before action B, then all memory effects of A are visible to B. Without a happens-before edge, visibility is NOT guaranteed.",
+    whenToUse: [
+      "Reasoning about whether a variable write in Thread A is visible to Thread B",
+      "Designing lock-free algorithms or synchronization primitives",
+      "Diagnosing visibility bugs (reading stale values even when writes occurred)",
+    ],
+    codeExamples: [
+      {
+        title: "The Eight Happens-Before Rules",
+        description: "Java's JMM specifies exactly eight rules that establish happens-before edges. If your code doesn't fit one of these rules, visibility is not guaranteed.",
+        code: `// Rule 1: Program order — within a single thread, each action HB all subsequent actions
+int a = 1;       // HB →
+int b = a + 1;   // HB →
+print(b);        // visible in program order within the SAME thread
+
+// Rule 2: Monitor unlock HB subsequent lock on same monitor
+synchronized (obj) { data = 42; }     // unlock HB
+synchronized (obj) { System.out.println(data); } // subsequent lock — sees 42
+
+// Rule 3: volatile write HB subsequent volatile reads of the same variable
+volatile int v;
+v = 42;            // volatile write HB
+int x = v;         // subsequent volatile read — sees 42
+
+// Rule 4: Thread.start() HB all actions in the started thread
+data = "hello";
+thread.start();    // start() HB
+// thread body sees data = "hello"
+
+// Rule 5: All actions in a thread HB Thread.join() on that thread
+thread.join();     // join() HB
+// after join(), caller sees all actions from the joined thread
+
+// Rule 6: Thread interrupt HB the interrupted thread detecting the interrupt
+thread.interrupt();         // interrupt() HB
+thread.isInterrupted();     // returns true
+
+// Rule 7: Constructors with final fields — writes to final fields in constructor
+//         HB reads of those fields via a reference to the constructed object
+//         (only if 'this' doesn't escape during construction)
+
+// Rule 8: Transitivity — if A HB B and B HB C, then A HB C`,
+      },
+      {
+        title: "Visibility Bug — Missing Happens-Before",
+        description: "Without a happens-before edge, a thread may read a stale value indefinitely — even after the writer has committed the update. This is not a 'timing issue' — it's permitted by the JMM.",
+        code: `// BUG: no happens-before between writer and reader
+public class VisibilityBug {
+    private boolean ready = false; // no volatile, no sync
+    private int value = 0;
+
+    // Thread 1 writes:
+    void writer() {
+        value = 42;
+        ready = true;
+    }
+
+    // Thread 2 reads:
+    void reader() {
+        while (!ready) { } // may spin FOREVER — no HB edge ensures ready=true is visible
+        System.out.println(value); // even if ready=true, may print 0 (value reordered)
+    }
+}
+
+// FIX: volatile ready establishes HB — volatile write(ready=true) HB volatile read(ready)
+// This also ensures value=42 is visible because HB is transitive
+public class VisibilityFixed {
+    private volatile boolean ready = false;
+    private int value = 0;
+
+    void writer() {
+        value = 42;
+        ready = true; // volatile write — HB for this AND all prior writes
+    }
+
+    void reader() {
+        while (!ready) { }     // volatile read — establishes HB edge
+        System.out.println(value); // value=42 is GUARANTEED visible
+    }
+}`,
+      },
+    ],
+    gotcha:
+      "Transitivity is key. A volatile write to field X creates a happens-before edge for ALL prior writes, not just writes to X. This means volatile on a 'guard flag' also covers visibility of non-volatile fields written before the flag.",
+    takeaway:
+      "Every shared memory access needs a happens-before edge or is a data race. Data races are not just 'timing issues' — the JMM explicitly allows a processor to return a stale cached value, forever. volatile, synchronized, Thread.start(), Thread.join(), and final fields are your happens-before tools.",
+    bestPractices: [
+      "Identify the happens-before edge explicitly when reviewing concurrent code — 'it works in tests' is not sufficient",
+      "Use volatile for simple shared flags and references; synchronized for compound check-then-act operations",
+      "Remember transitivity: writing to a volatile guard field makes ALL prior writes visible to readers of that flag",
+      "When in doubt, use a higher-level abstraction (CountDownLatch, BlockingQueue) that provides HB guarantees internally",
+    ],
+    thumbRules: [
+      "Need visibility between threads without mutual exclusion → volatile",
+      "Need mutual exclusion AND visibility → synchronized or ReentrantLock",
+      "Publishing results from background thread to caller → Thread.join() establishes HB",
+      "Publishing object at construction → final fields + no 'this' escape",
+      "No HB edge between write and read → data race → undefined behavior under JMM",
+    ],
+    hiddenTruths: [
+      "Happens-before is NOT the same as 'happened before in wall-clock time'. Thread A may write at T=100ms and Thread B may read at T=200ms, but without a HB edge, the JMM does NOT guarantee Thread B sees Thread A's write. Time ordering ≠ JMM ordering.",
+      "A volatile write creates a StoreLoad memory barrier — the most expensive kind. It flushes the store buffer and invalidates the load buffer. This is why volatile on a hot counter is slower than an AtomicLong (which uses CAS without a full StoreLoad).",
+      "The JMM does NOT directly specify CPU cache coherence. It specifies 'as-if' semantics — the JVM can use any mechanism (memory barriers, cache flush, etc.) as long as the HB rules are satisfied. The CPU architecture determines which instructions are needed.",
+      "Double-checked locking without volatile is broken because the JMM allows the JIT to reorder the write to 'instance' BEFORE the constructor completes. volatile on instance adds a write barrier that prevents this reordering.",
+    ],
+  },
 ];
 
 export const CATEGORY_META = {
-  Fundamentals: { color: "var(--blue)", bg: "var(--blue-subtle)", count: CONCEPTS.filter(c => c.category === "Fundamentals").length },
-  Synchronization: { color: "var(--red)", bg: "var(--red-subtle)", count: CONCEPTS.filter(c => c.category === "Synchronization").length },
-  Pitfalls: { color: "var(--gold)", bg: "var(--gold-subtle)", count: CONCEPTS.filter(c => c.category === "Pitfalls").length },
+  Fundamentals:        { color: "var(--blue)",  bg: "var(--blue-subtle)",  count: CONCEPTS.filter(c => c.category === "Fundamentals").length },
+  Synchronization:     { color: "var(--red)",   bg: "var(--red-subtle)",   count: CONCEPTS.filter(c => c.category === "Synchronization").length },
+  Pitfalls:            { color: "var(--gold)",  bg: "var(--gold-subtle)",  count: CONCEPTS.filter(c => c.category === "Pitfalls").length },
+  Performance:         { color: "var(--green)", bg: "var(--green-subtle, color-mix(in srgb, var(--green) 12%, transparent))", count: CONCEPTS.filter(c => c.category === "Performance").length },
+  "Modern Java":       { color: "#A78BFA",      bg: "rgba(167,139,250,.12)",  count: CONCEPTS.filter(c => c.category === "Modern Java").length },
+  "Java Memory Model": { color: "#F472B6",      bg: "rgba(244,114,182,.12)", count: CONCEPTS.filter(c => c.category === "Java Memory Model").length },
+  Patterns:            { color: "#34D399",      bg: "rgba(52,211,153,.12)",  count: CONCEPTS.filter(c => c.category === "Patterns").length },
 };
