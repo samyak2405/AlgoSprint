@@ -55,7 +55,7 @@ export function ArrayVisualizer() {
     const idx = Number(indexVal);
     if (inputVal.trim() === "" || isNaN(val)) { setStatus("Enter a valid value."); return; }
     if (indexVal.trim() === "" || isNaN(idx) || idx < 0 || idx > itemsRef.current.length) {
-      setStatus(`Index must be 0–${itemsRef.current.length}.`); return;
+      setStatus(`Index should be 0–${itemsRef.current.length}.`); return;
     }
     setAnimating(true);
     const arr = [...itemsRef.current];
